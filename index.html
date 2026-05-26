@@ -152,9 +152,52 @@
                     if (!found[c].includes(s)) found[c].push(s);
                 });
 
+                const categoryOrder = [
+                    "cartões de crédito",
+                    "cartões de credito",
+                    "cartao de credito",
+                    "cartão de crédito",
+                    "fidelidade nacional",
+                    "fidelidade internacional",
+                    "passagem em dinheiro",
+                    "hotéis",
+                    "hoteis",
+                    "hotel"
+                ];
+
+                const subcategoryOrder = [
+                    "acúmulo",
+                    "acumulo",
+                    "isenção de anuidade",
+                    "isencao de anuidade",
+                    "benefícios",
+                    "beneficios",
+                    "adesão",
+                    "adesao",
+                    "transferência bonificada",
+                    "transferencia bonificada",
+                    "compra de pontos",
+                    "resgate de voos",
+                    "bônus de envio",
+                    "bonus de envio",
+                    "alianças aéreas",
+                    "aliancas aereas",
+                    "tabela fixa",
+                    "passagem em dinheiro"
+                ];
+
                 setFilterTree(prevTree => {
-                    return Object.keys(found).map(cat => {
-                        const subs = found[cat];
+                    const mapped = Object.keys(found).map(cat => {
+                        const subsRaw = found[cat];
+                        const subs = [...subsRaw].sort((a, b) => {
+                            const idxA = subcategoryOrder.indexOf(a.toLowerCase().trim());
+                            const idxB = subcategoryOrder.indexOf(b.toLowerCase().trim());
+                            if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+                            if (idxA !== -1) return -1;
+                            if (idxB !== -1) return 1;
+                            return a.localeCompare(b);
+                        });
+
                         const existing = prevTree.find(item => item.categoria.toLowerCase() === cat.toLowerCase());
                         if (existing) {
                             const validActiveSubs = existing.activeSubs.filter(sub => subs.some(s => s.toLowerCase() === sub.toLowerCase()));
@@ -179,6 +222,15 @@
                                 activeSubs: [...subs]
                             };
                         }
+                    });
+
+                    return mapped.sort((a, b) => {
+                        const idxA = categoryOrder.indexOf(a.categoria.toLowerCase().trim());
+                        const idxB = categoryOrder.indexOf(b.categoria.toLowerCase().trim());
+                        if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+                        if (idxA !== -1) return -1;
+                        if (idxB !== -1) return 1;
+                        return a.categoria.localeCompare(b.categoria);
                     });
                 });
             }, [posts]);
@@ -253,13 +305,24 @@
                 }));
             };
 
+            const clearFilters = () => {
+                setFilterTree(prev => prev.map(item => ({
+                    ...item,
+                    selected: false,
+                    activeSubs: []
+                })));
+            };
+
             const getFilteredPosts = () => {
-                const activeSubs = filterTree.flatMap(item => item.activeSubs);
                 const filtered = posts.filter(p => {
                     const cat = (p.categoria || "").trim().toLowerCase();
                     const sub = (p.subcategoria || "").trim().toLowerCase();
                     if (cat === "ignorado" || sub === "ignorado") return false;
-                    return !p.subcategoria || activeSubs.includes(p.subcategoria);
+
+                    const matchedCat = filterTree.find(item => item.categoria.toLowerCase().trim() === cat);
+                    if (!matchedCat) return true;
+                    if (!p.subcategoria) return matchedCat.activeSubs.length > 0;
+                    return matchedCat.activeSubs.some(s => s.toLowerCase().trim() === sub);
                 });
                 return filtered.sort((a, b) => {
                     const keyA = a.link || a.url || a.id;
@@ -656,12 +719,20 @@
                                         <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse" />
                                         <span className="text-xs font-extrabold text-gray-800 uppercase tracking-wider font-sans">Filtros</span>
                                     </div>
-                                    <button
-                                        onClick={() => setIsBottomSheetOpen(false)}
-                                        className="text-xs text-gray-500 hover:text-gray-950 border border-gray-300 bg-white hover:bg-gray-100 px-2.5 py-1 rounded-md transition font-semibold"
-                                    >
-                                        Fechar
-                                    </button>
+                                    <div className="flex items-center gap-1.5 shrink-0">
+                                        <button
+                                            onClick={clearFilters}
+                                            className="text-xs text-red-500 hover:text-red-700 border border-red-200 bg-white hover:bg-red-50 px-2.5 py-1 rounded-md transition font-semibold cursor-pointer"
+                                        >
+                                            Limpar
+                                        </button>
+                                        <button
+                                            onClick={() => setIsBottomSheetOpen(false)}
+                                            className="text-xs text-gray-500 hover:text-gray-955 border border-gray-300 bg-white hover:bg-gray-100 px-2.5 py-1 rounded-md transition font-semibold cursor-pointer"
+                                        >
+                                            Fechar
+                                        </button>
+                                    </div>
                                 </div>
 
                                 <div className="flex-1 overflow-y-auto p-4 space-y-4">
@@ -708,8 +779,8 @@
                                                             onClick={() => {
                                                                 const subNames = item.subcategorias;
                                                                 const alarmKeys = subNames.map(sub => item.categoria + ":::" + sub);
-                                                                const someAlerted = subNames.some(sub => activeAlerts.includes(item.categoria + ":::" + sub));
-                                                                if (someAlerted) {
+                                                                const allAlerted = subNames.every(sub => activeAlerts.includes(item.categoria + ":::" + sub));
+                                                                if (allAlerted) {
                                                                     setActiveAlerts(prev => prev.filter(key => !alarmKeys.includes(key)));
                                                                 } else {
                                                                     setActiveAlerts(prev => {
@@ -720,9 +791,9 @@
                                                             }}
                                                             style={{ width: "36px", height: "36px" }}
                                                             className={"flex items-center justify-center rounded-full transition cursor-pointer shrink-0 " + (
-                                                                item.subcategorias.some(sub => activeAlerts.includes(item.categoria + ":::" + sub))
-                                                                    ? "text-red-500 bg-red-50 scale-105"
-                                                                    : "text-gray-400 hover:text-gray-600 hover:bg-gray-100"
+                                                                item.subcategorias.every(sub => activeAlerts.includes(item.categoria + ":::" + sub))
+                                                                    ? "text-red-500 bg-red-100 font-bold scale-105"
+                                                                    : "text-gray-400 hover:text-gray-650 hover:bg-gray-100"
                                                             )}
                                                             title="Alternar todos os alertas desta categoria"
                                                         >
