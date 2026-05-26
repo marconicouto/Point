@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Point das Milhas</title>
+    <title>Point das Milhas PWA</title>
     <!-- Bibliotecas Necessárias via CDN -->
     <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
@@ -11,8 +11,6 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- @supabase/supabase-js cliente oficial -->
     <script src="https://unpkg.com/@supabase/supabase-js@2.39.8/dist/umd/supabase.js"></script>
-    <!-- Lucide Icons -->
-    <script src="https://unpkg.com/lucide@latest"></script>
     
     <script>
         tailwind.config = {
@@ -37,6 +35,8 @@
             padding: 0;
             background-color: #F1F3F4;
             overflow: hidden;
+            user-select: none;
+            -webkit-user-select: none;
         }
         /* Ocultar barra de rolagem estética */
         ::-webkit-scrollbar {
@@ -51,7 +51,7 @@
         }
     </style>
 </head>
-<body class="bg-[#F1F3F4] text-gray-900 antialiased select-none">
+<body class="bg-[#F1F3F4] text-gray-900 antialiased">
     <div id="root"></div>
 
     <script type="text/babel">
@@ -69,33 +69,59 @@
             const [readingPost, setReadingPost] = useState(null);
             const [lastRefreshTime, setLastRefreshTime] = useState(new Date().toLocaleTimeString());
             const [secondsToRefresh, setSecondsToRefresh] = useState(1200);
-
-            // Filtros com checkbox 100% circular
-            const [filterTree, setFilterTree] = useState([
-                {
-                    categoria: "Cartões de Crédito",
-                    subcategorias: ["Acúmulo", "Benefícios", "Isenção de Anuidade", "Adesão"],
-                    isOpen: true,
-                    selected: true,
-                    activeSubs: ["Acúmulo", "Benefícios", "Isenção de Anuidade", "Adesão"]
-                },
-                {
-                    categoria: "Fidelidade Nacional",
-                    subcategorias: ["Transferência Bonificada", "Compra de Pontos", "Resgate de Voos"],
-                    isOpen: true,
-                    selected: true,
-                    activeSubs: ["Transferência Bonificada", "Compra de Pontos", "Resgate de Voos"]
-                },
-                {
-                    categoria: "Fidelidade Internacional",
-                    subcategorias: ["Bônus de Envio", "Alianças Aéreas", "Tabela Fixa"],
-                    isOpen: false,
-                    selected: false,
-                    activeSubs: []
+            
+            // Gestão de Favoritos local storage na PWA
+            const [favorites, setFavorites] = useState(() => {
+                try {
+                    return JSON.parse(localStorage.getItem("point_feed_favorites") || "[]");
+                } catch {
+                    return [];
                 }
-            ]);
+            });
 
-            const [activeAlerts, setActiveAlerts] = useState(["Transferência Bonificada"]);
+            const toggleFavorite = (postUrl, e) => {
+                e.stopPropagation();
+                setFavorites(prev => {
+                    const next = prev.includes(postUrl) ? prev.filter(p => p !== postUrl) : [...prev, postUrl];
+                    localStorage.setItem("point_feed_favorites", JSON.stringify(next));
+                    return next;
+                });
+            };
+
+            // Gestos para Puxar e Atualizar (Pull to Refresh) na PWA
+            const [pullDistance, setPullDistance] = useState(0);
+            const touchStartY = useRef(0);
+            const containerRef = useRef(null);
+
+            const handleTouchStart = (e) => {
+                const isAtTop = containerRef.current ? containerRef.current.scrollTop === 0 : true;
+                if (isAtTop) {
+                    touchStartY.current = e.touches[0].clientY;
+                } else {
+                    touchStartY.current = -1;
+                }
+            };
+
+            const handleTouchMove = (e) => {
+                if (touchStartY.current === -1) return;
+                const currentY = e.touches[0].clientY;
+                const diff = currentY - touchStartY.current;
+                if (diff > 0) {
+                    const pull = Math.min(diff * 0.4, 80);
+                    setPullDistance(pull);
+                }
+            };
+
+            const handleTouchEnd = () => {
+                if (pullDistance >= 50) {
+                    fetchNewsFromSupabase();
+                }
+                setPullDistance(0);
+            };
+
+            // Filtros dinâmicos que iniciam vazios de forma que apenas categorias existentes no supabase apareçam
+            const [filterTree, setFilterTree] = useState([]);
+            const [activeAlerts, setActiveAlerts] = useState([]);
 
             useEffect(() => {
                 fetchNewsFromSupabase();
@@ -111,6 +137,7 @@
                 return () => clearInterval(interval);
             }, []);
 
+            // População dinâmica dos filtros baseada nos posts existentes
             useEffect(() => {
                 if (posts.length === 0) return;
                 const found = {};
@@ -125,44 +152,38 @@
                     if (!found[c].includes(s)) found[c].push(s);
                 });
 
-                setFilterTree(prev => {
-                    let isChanged = false;
-                    const nextTree = prev.map(item => {
-                        const existingCat = Object.keys(found).find(c => c.toLowerCase() === item.categoria.toLowerCase());
-                        if (existingCat) {
-                            const newSubs = [...item.subcategorias];
-                            const newActive = [...item.activeSubs];
-                            found[existingCat].forEach(sub => {
-                                if (!item.subcategorias.some(s => s.toLowerCase() === sub.toLowerCase())) {
-                                    newSubs.push(sub);
-                                    newActive.push(sub);
-                                    isChanged = true;
+                setFilterTree(prevTree => {
+                    return Object.keys(found).map(cat => {
+                        const subs = found[cat];
+                        const existing = prevTree.find(item => item.categoria.toLowerCase() === cat.toLowerCase());
+                        if (existing) {
+                            const validActiveSubs = existing.activeSubs.filter(sub => subs.some(s => s.toLowerCase() === sub.toLowerCase()));
+                            subs.forEach(sub => {
+                                if (!existing.subcategorias.some(s => s.toLowerCase() === sub.toLowerCase())) {
+                                    validActiveSubs.push(sub);
                                 }
                             });
-                            return { ...item, subcategorias: newSubs, activeSubs: newActive, selected: newActive.length === newSubs.length };
-                        }
-                        return item;
-                    });
-
-                    Object.keys(found).forEach(cat => {
-                        const hasCat = prev.some(item => item.categoria.toLowerCase() === cat.toLowerCase());
-                        if (!hasCat) {
-                            nextTree.push({
+                            return {
                                 categoria: cat,
-                                subcategorias: found[cat],
+                                subcategorias: subs,
+                                isOpen: existing.isOpen,
+                                selected: validActiveSubs.length === subs.length,
+                                activeSubs: validActiveSubs
+                            };
+                        } else {
+                            return {
+                                categoria: cat,
+                                subcategorias: subs,
                                 isOpen: true,
                                 selected: true,
-                                activeSubs: [...found[cat]]
-                            });
-                            isChanged = true;
+                                activeSubs: [...subs]
+                            };
                         }
                     });
-
-                    return isChanged ? nextTree : prev;
                 });
             }, [posts]);
 
-            // Método Real Supabase API
+            // Método Real Supabase API ou fallback local
             const fetchNewsFromSupabase = async () => {
                 setIsLoading(true);
                 try {
@@ -179,7 +200,7 @@
                             setLastRefreshTime(new Date().toLocaleTimeString());
                         }
                     } else {
-                        // Dados de Fallback sofisticados de portais de milhas reais
+                        // Dados de Fallback qualificados
                         const mockData = [
                             {
                                 id: 1,
@@ -188,7 +209,7 @@
                                 published_at: new Date(Date.now() - 1000*60*15).toISOString(),
                                 summary: "Oportunidade para gerar lotes de 1.000 pontos Livelo a valores competitivos.",
                                 categoria: "Fidelidade Nacional",
-                                subcategoria: "Compra de Pontos",
+                                subcategoria: "Transferência bonificada",
                                 source_site: "pontospravoar.com"
                             },
                             {
@@ -198,7 +219,7 @@
                                 published_at: new Date(Date.now() - 1000*60*45).toISOString(),
                                 summary: "Cartão de metal mais exclusivo do país mantém benefícios premium inalterados.",
                                 categoria: "Cartões de Crédito",
-                                subcategoria: "Benefícios",
+                                subcategoria: "Passagem em dinheiro",
                                 source_site: "passageirodeprimeira.com"
                             }
                         ];
@@ -232,190 +253,266 @@
                 }));
             };
 
-            const toggleAlert = (subName) => {
-                setActiveAlerts(prev => prev.includes(subName) ? prev.filter(a => a !== subName) : [...prev, subName]);
-            };
-
             const getFilteredPosts = () => {
                 const activeSubs = filterTree.flatMap(item => item.activeSubs);
-                return posts.filter(p => {
+                const filtered = posts.filter(p => {
                     const cat = (p.categoria || "").trim().toLowerCase();
                     const sub = (p.subcategoria || "").trim().toLowerCase();
                     if (cat === "ignorado" || sub === "ignorado") return false;
                     return !p.subcategoria || activeSubs.includes(p.subcategoria);
                 });
+                return filtered.sort((a, b) => {
+                    const keyA = a.link || a.url || a.id;
+                    const keyB = b.link || b.url || b.id;
+                    const aFav = favorites.includes(keyA);
+                    const bFav = favorites.includes(keyB);
+                    if (aFav && !bFav) return -1;
+                    if (!aFav && bFav) return 1;
+                    return new Date(b.published_at).getTime() - new Date(a.published_at).getTime();
+                });
             };
 
-            const getCategoryBadgeStyle = (cat) => {
-                const c = (cat || "").toLowerCase();
-                if (c.includes("cart") || c.includes("crédito")) {
-                    return "bg-amber-50 text-amber-700 border border-amber-200";
+            const getCategoryTheme = (categoryName) => {
+                const name = (categoryName || "Geral").trim();
+                const defaultStyle = {
+                    badge: "bg-blue-50 text-blue-700 border border-blue-200 font-bold",
+                    dot: "bg-blue-600",
+                    border: "border-blue-300",
+                    checkbox: "bg-blue-600 border-blue-700",
+                    text: "text-blue-600",
+                    bgLight: "bg-blue-50"
+                };
+                if (!name) return defaultStyle;
+
+                const categoryLower = name.toLowerCase();
+                if (categoryLower.includes("cartão") || categoryLower.includes("cartao") || categoryLower.includes("credito") || categoryLower.includes("crédito")) {
+                    return {
+                        badge: "bg-purple-50 text-purple-700 border border-purple-200/80 font-bold",
+                        dot: "bg-purple-600",
+                        border: "border-purple-300",
+                        checkbox: "bg-purple-600 border-purple-600",
+                        text: "text-purple-600",
+                        bgLight: "bg-purple-50"
+                    };
                 }
-                if (c.includes("nacional")) {
-                    return "bg-blue-50 text-blue-700 border border-blue-200";
+
+                const styles = [
+                    {
+                        badge: "bg-blue-50 text-[#1a73e8] border border-blue-200 font-bold",
+                        dot: "bg-[#1a73e8]",
+                        border: "border-blue-300",
+                        checkbox: "bg-[#1a73e8] border-[#1a73e8]",
+                        text: "text-[#1a73e8]",
+                        bgLight: "bg-blue-50"
+                    },
+                    {
+                        badge: "bg-red-50 text-red-700 border border-red-200 font-bold",
+                        dot: "bg-red-600",
+                        border: "border-red-300",
+                        checkbox: "bg-red-600 border-red-600",
+                        text: "text-red-600",
+                        bgLight: "bg-red-50"
+                    },
+                    {
+                        badge: "bg-yellow-50 text-yellow-700 border border-yellow-200 font-bold",
+                        dot: "bg-yellow-500",
+                        border: "border-yellow-300",
+                        checkbox: "bg-yellow-600 border-yellow-600",
+                        text: "text-yellow-605",
+                        bgLight: "bg-yellow-50"
+                    },
+                    {
+                        badge: "bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold",
+                        dot: "bg-emerald-600",
+                        border: "border-emerald-300",
+                        checkbox: "bg-emerald-600 border-emerald-600",
+                        text: "text-emerald-700",
+                        bgLight: "bg-emerald-50"
+                    }
+                ];
+
+                const sortedCategories = filterTree.map(t => t.categoria.trim().toLowerCase());
+                const index = sortedCategories.indexOf(name.toLowerCase());
+                if (index !== -1) {
+                    return styles[index % styles.length];
                 }
-                return "bg-purple-50 text-purple-700 border border-purple-200";
+                return defaultStyle;
+            };
+
+            const getSubBadgeStyle = (subName, catName) => {
+                const sub = (subName || "").toLowerCase().trim();
+                if (sub.includes("transferência bonificada") || sub.includes("transfência bonificada")) {
+                    return "bg-amber-50 text-amber-700 border border-amber-200 font-bold";
+                }
+                if (sub.includes("passagem em dinheiro")) {
+                    return "bg-emerald-50 text-[#15803d] border border-emerald-200 font-bold";
+                }
+                return getCategoryTheme(catName).badge;
+            };
+
+            const getSubCheckboxColor = (subName, catName) => {
+                const sub = (subName || "").toLowerCase().trim();
+                if (sub.includes("transferência bonificada") || sub.includes("transfência bonificada")) {
+                    return "bg-amber-600 border-amber-600";
+                }
+                if (sub.includes("passagem em dinheiro")) {
+                    return "bg-emerald-600 border-emerald-600";
+                }
+                return getCategoryTheme(catName).checkbox;
+            };
+
+            const formatSourceName = (domain) => {
+                if (!domain) return "Portal";
+                const d = domain.toLowerCase();
+                if (d.includes("passageirodeprimeira")) return "Passageiro de Primeira";
+                if (d.includes("pontospravoar") || d.includes("pontos para voar")) return "Pontos pra Voar";
+                if (d.includes("mestredasmilhas") || d.includes("mestre das milhas")) return "Mestre das Milhas";
+                if (d.includes("meumilhaodemilhas") || d.includes("meumilhao")) return "Meu Milhão de Milhas";
+                if (d.includes("melhorescartoes") || d.includes("melhores cartões")) return "Melhores Cartões";
+                if (d.includes("cartoesdecredito") || d.includes("cartões de crédito")) return "Cartões de Crédito";
+                return domain.replace(/^(https?:\/\/)?(www\.)?/, "").split("/")[0];
+            };
+
+            const getRelativeTime = (isoString) => {
+                try {
+                    const diffMs = Date.now() - new Date(isoString).getTime();
+                    const diffMins = Math.floor(diffMs / (1000 * 60));
+                    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+
+                    if (diffMins < 1) return "agora mesmo";
+                    if (diffMins < 60) return "há " + diffMins + " min";
+                    if (diffHours < 24) return "há " + diffHours + "h";
+                    return new Date(isoString).toLocaleDateString("pt-BR", { day: "numeric", month: "short" });
+                } catch {
+                    return "há pouco";
+                }
             };
 
             return (
-                <div className="flex flex-col h-screen max-w-sm mx-auto bg-[#F1F3F4] border-x border-gray-200 relative shadow-2xl">
+                <div className="flex flex-col h-[100dvh] max-w-sm mx-auto bg-[#F1F3F4] border-x border-gray-200 relative shadow-2xl overflow-hidden">
                     
-                    {/* CABEÇALHO CLEAN WHITE COM TEXTO GRADIENTE */}
-                    <header className="sticky top-0 bg-white border-b border-gray-150 h-14 flex items-center justify-between px-4 z-40 shadow-sm">
+                    {/* CABEÇALHO CLEAN WHITE COM BOTOES DE FILTROS */}
+                    <header className="sticky top-0 bg-white border-b border-gray-150 h-14 flex items-center justify-between px-4 z-40 shadow-sm shrink-0">
                         <div className="flex items-center gap-2">
                             <span className="font-extrabold tracking-tight text-xs font-sans uppercase bg-gradient-to-r from-[#0f3a5f] to-[#1d4ed8] bg-clip-text text-transparent">POINT DAS MILHAS</span>
                         </div>
                         
                         <div className="flex items-center gap-1.5">
                             <button 
-                                onClick={fetchNewsFromSupabase}
-                                className="flex items-center gap-1 bg-[#0f3a5f]/10 hover:bg-[#0f3a5f]/20 text-[#0f3a5f] px-2.5 py-0.5 rounded-full text-[9px] font-bold transition border border-[#0f3a5f]/20 shadow-sm active:scale-95 cursor-pointer"
+                                onClick={() => setIsBottomSheetOpen(true)}
+                                className="flex items-center gap-1 bg-[#0f3a5f]/10 hover:bg-[#0f3a5f]/20 text-[#0f3a5f] px-3 py-1 rounded-full text-[10px] font-bold transition border border-[#0f3a5f]/20 shadow-sm active:scale-95 cursor-pointer"
                             >
-                                <i data-lucide="refresh-cw" className={"w-2.5 h-2.5 text-[#0f3a5f] " + (isLoading ? "animate-spin" : "")}></i>
-                                <span>Atualizar</span>
+                                <svg className="w-3 h-3 text-[#0f3a5f]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+                                <span>Filtros</span>
                             </button>
                         </div>
                     </header>
 
-                    {/* MIOLO COM SCROLL INDEPENDENTE */}
-                    <div className="flex-1 overflow-y-auto px-3 py-3 pb-24">
-                        {isLoading && (
-                            <div className="py-12 flex flex-col items-center justify-center text-gray-500 text-xs">
-                                <span className="animate-spin text-blue-500 text-lg mb-2">●</span>
-                                Carregando últimas novidades...
-                            </div>
-                        )}
-
-                        {!isLoading && getFilteredPosts().length === 0 ? (
-                            <div className="py-20 text-center text-gray-500 text-xs px-6 border border-dashed border-gray-300 bg-white rounded-2xl shadow-sm">
-                                Nenhuma notícia atende aos filtros atuais. Modifique suas seleções na aba de Filtros abaixo!
-                            </div>
-                        ) : (
-                            <div className="flex flex-col gap-1.5">
-                                {getFilteredPosts().map(post => {
-                                    return (
-                                        <div 
-                                            key={post.id || post.url || post.link}
-                                            onClick={() => setReadingPost(post)}
-                                            className="bg-white hover:bg-gray-50 border border-gray-200/80 p-2.5 text-left rounded-xl transition cursor-pointer flex flex-col gap-1 shadow-sm active:bg-gray-100"
-                                        >
-                                            <h3 className="text-[11px] font-bold text-gray-900 line-clamp-2 leading-snug tracking-tight">
-                                                {post.title}
-                                            </h3>
-                                            
-                                            <div className="flex items-center justify-between text-[10px] text-gray-500 font-medium">
-                                                <span>{post.source_site ? post.source_site.replace("www.","") : (post.sourceName || "portal")}</span>
-                                                <span className="font-mono text-[9px]">recent</span>
-                                            </div>
-
-                                            <div className="flex items-center justify-between mt-1 pt-1 border-t border-gray-100">
-                                                <span className={"font-mono text-[8px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wide shrink-0 " + getCategoryBadgeStyle(post.categoria)}>
-                                                    {post.subcategoria || "Milhas Geral"}
-                                                </span>
-                                                <i data-lucide="chevron-right" className="w-3.5 h-3.5 text-gray-400"></i>
-                                            </div>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        )}
-                    </div>
-
-                    {/* CONTROLES DE LEITURA CHEIA */}
-                    {readingPost && (
-                        <div className="absolute inset-x-0 top-0 bottom-0 bg-white z-50 rounded-b-[34px] p-1 flex flex-col">
-                            <div className="h-14 bg-white border-b border-gray-150 flex items-center justify-between px-2 shrink-0">
-                                <button 
-                                    onClick={() => setReadingPost(null)}
-                                    style={{ width: '45px', height: '45px' }}
-                                    className="flex items-center justify-center text-gray-600 hover:text-gray-900"
+                    {/* MIOLO COM SCROLL INDEPENDENTE E TOUCH REFRESH */}
+                    {activeScreen === "feed" && (
+                        <div 
+                            ref={containerRef}
+                            onTouchStart={handleTouchStart}
+                            onTouchMove={handleTouchMove}
+                            onTouchEnd={handleTouchEnd}
+                            className="flex-1 overflow-y-auto px-3.5 py-3 pb-24 scrollbar-none"
+                        >
+                            {pullDistance > 10 && (
+                                <div 
+                                    className="flex items-center justify-center text-gray-500 py-2.5 transition-all duration-150 overflow-hidden shrink-0"
+                                    style={{ height: pullDistance + 'px' }}
                                 >
-                                    <span className="text-lg font-bold">←</span>
-                                </button>
-                                <span className="text-[10px] font-bold text-gray-900 max-w-[150px] truncate">{readingPost.title}</span>
-                                <a 
-                                    href={readingPost.url || readingPost.link} 
-                                    target="_blank" 
-                                    className="text-[10px] text-blue-600 bg-blue-50 hover:bg-blue-100 px-2.5 py-1.5 rounded font-bold transition flex items-center gap-1 active:scale-95"
-                                >
-                                    Abrir Link
-                                </a>
-                            </div>
-                            <div className="flex-1 bg-white rounded-b-2xl overflow-hidden relative flex flex-col">
-                                <iframe 
-                                    src={readingPost.url || readingPost.link} 
-                                    className="flex-1 w-full border-none h-full bg-gray-50"
-                                    title="Modo Leitura"
-                                    sandbox="allow-scripts allow-same-origin allow-popups"
-                                />
-                            </div>
+                                    <span className="text-[11px] font-bold text-gray-500 flex items-center gap-1.5 animate-pulse">
+                                        <svg className="w-3.5 h-3.5 text-blue-600 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+                                        {pullDistance >= 50 ? "Solte para atualizar" : "Puxe para atualizar..."}
+                                    </span>
+                                </div>
+                            )}
+
+                            {isLoading && (
+                                <div className="py-16 flex flex-col items-center justify-center text-gray-500 text-xs animate-pulse">
+                                    <svg className="w-5 h-5 animate-spin text-blue-600 mb-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+                                    Carregando últimas novidades...
+                                </div>
+                            )}
+
+                            {!isLoading && getFilteredPosts().length === 0 ? (
+                                <div className="py-20 text-center text-gray-500 text-xs px-6 border border-dashed border-gray-300 bg-white rounded-2xl shadow-sm">
+                                    Nenhuma notícia atende aos filtros atuais. Modifique suas seleções no botão lateral de Filtros!
+                                </div>
+                            ) : (
+                                <div className="flex flex-col gap-2.5">
+                                    {getFilteredPosts().map(post => {
+                                        return (
+                                            <div 
+                                                key={post.id || post.url || post.link}
+                                                onClick={() => setReadingPost(post)}
+                                                className="bg-white hover:bg-gray-50 border border-gray-200/80 p-3 text-left rounded-xl transition cursor-pointer flex flex-col gap-1 shadow-sm active:bg-gray-100"
+                                            >
+                                                <h3 className="text-sm font-bold text-gray-950 line-clamp-2 leading-snug tracking-tight font-sans">
+                                                    {post.title}
+                                                </h3>
+                                                
+                                                <div className="flex items-center justify-between text-xs text-gray-500 font-semibold mt-0.5">
+                                                    <span>{formatSourceName(post.source_site || "")}</span>
+                                                    <span className="font-mono text-[9.5px] text-gray-400">{getRelativeTime(post.published_at)}</span>
+                                                </div>
+
+                                                <div className="flex items-center justify-between mt-1.5 pt-1.5 border-t border-gray-100">
+                                                    <span className={"font-mono text-[9px] px-2.2 py-0.5 rounded-full font-extrabold uppercase tracking-wide shrink-0 " + getSubBadgeStyle(post.subcategoria, post.categoria)}>
+                                                        {post.subcategoria || "Milhas Geral"}
+                                                    </span>
+                                                    <button
+                                                        onClick={(e) => toggleFavorite(post.link || post.url || post.id, e)}
+                                                        className="p-1 transition"
+                                                    >
+                                                        <svg 
+                                                            className={"w-4 h-4 " + (favorites.includes(post.link || post.url || post.id) ? "fill-[#fbbc05] text-[#fbbc05]" : "text-gray-300")}
+                                                            viewBox="0 0 24 24"
+                                                            fill="none"
+                                                            stroke="currentColor"
+                                                            strokeWidth="2.5"
+                                                        >
+                                                            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+                                                        </svg>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
                         </div>
                     )}
 
-                    {/* BARRA DE NAVEGAÇÃO INFERIOR FIXA (BOTTOM NAV) - COR BRANCA COM TEXTO EM AZUL GRADIENTE */}
-                    <nav className="absolute bottom-0 inset-x-0 h-14 bg-white border-t border-gray-150 flex items-center justify-around z-40 px-2 shrink-0 shadow-md text-[#0f3a5f]">
-                        <button 
-                            onClick={() => { setActiveScreen("feed"); setIsBottomSheetOpen(false); }}
-                            style={{ width: '56px', height: '44px' }}
-                            className={"flex flex-col items-center justify-center gap-0.5 transition " + (activeScreen === "feed" ? "scale-105" : "hover:text-[#0f3a5f]/80")}
-                        >
-                            <i data-lucide="book-open" className={"w-4 h-4 " + (activeScreen === "feed" ? "text-[#0f3a5f]" : "text-[#0f3a5f]/50")}></i>
-                            <span className={"text-[9px] font-extrabold " + (activeScreen === "feed" ? "bg-gradient-to-r from-[#0f3a5f] to-[#1d4ed8] bg-clip-text text-transparent" : "text-[#0f3a5f]/50")}>Notícias</span>
-                        </button>
-                        
-                        <button 
-                            onClick={() => setIsBottomSheetOpen(true)}
-                            style={{ width: '64px', height: '44px' }}
-                            className="flex flex-col items-center justify-center gap-0.5"
-                        >
-                            <div className="w-7 h-7 rounded-full flex items-center justify-center bg-[#0f3a5f]/10 border border-[#0f3a5f]/20 shadow-sm relative -top-0.5 animate-fade-in">
-                                <i data-lucide="filter" className="w-3.5 h-3.5 text-[#0f3a5f]"></i>
-                            </div>
-                            <span className="text-[9px] font-extrabold text-[#0f3a5f]/50 -mt-0.5">Filtros</span>
-                        </button>
-
-                        <button 
-                            onClick={() => { setActiveScreen("alerts"); setIsBottomSheetOpen(false); }}
-                            style={{ width: '56px', height: '44px' }}
-                            className={"flex flex-col items-center justify-center gap-0.5 transition " + (activeScreen === "alerts" ? "scale-105" : "hover:text-[#0f3a5f]/80")}
-                        >
-                            <div className="relative">
-                                <i data-lucide="bell" className={"w-4 h-4 " + (activeScreen === "alerts" ? "text-[#0f3a5f]" : "text-[#0f3a5f]/50")}></i>
-                                {activeAlerts.length > 0 && (
-                                    <span className="absolute -top-1.5 -right-1.5 w-2.5 h-2.5 bg-red-500 text-white font-black text-[7px] flex items-center justify-center rounded-full border border-white animate-fade-in">
-                                        {activeAlerts.length}
-                                    </span>
-                                )}
-                            </div>
-                            <span className={"text-[9px] font-extrabold " + (activeScreen === "alerts" ? "bg-gradient-to-r from-[#0f3a5f] to-[#1d4ed8] bg-clip-text text-transparent" : "text-[#0f3a5f]/50")}>Alertas</span>
-                        </button>
-                    </nav>
-
                     {/* ALERTA SISTÊMICO PUSH */}
                     {activeScreen === "alerts" && (
-                        <div className="flex-1 overflow-y-auto px-2 py-3 pb-16 text-left bg-[#F1F3F4]">
-                            <h3 className="text-xs font-bold text-gray-800 uppercase tracking-wide mb-2 border-b border-gray-200 pb-1.5 flex items-center gap-1.5">
-                                <i data-lucide="bell" className="w-3.5 h-3.5 text-blue-600 animate-pulse"></i> Alertas Ativos
+                        <div className="flex-1 overflow-y-auto px-3.5 py-4 pb-24 text-left bg-[#F1F3F4]">
+                            <h3 className="text-xs font-bold text-gray-800 uppercase tracking-wide mb-2.5 border-b border-gray-200 pb-2 flex items-center gap-1.5">
+                                <svg className="w-3.5 h-3.5 text-blue-600 animate-pulse" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 0 1-3.46 0"/></svg> Alertas Ativos
                             </h3>
 
-                            <p className="text-[10px] text-gray-650 mb-3 leading-relaxed font-sans">
-                                Você receberá alertas push virtuais no celular sempre que surgir uma nova notícia nos canais marcados em azul.
+                            <p className="text-[10.5px] text-gray-600 mb-4 leading-relaxed font-sans font-medium">
+                                Você receberá alertas push virtuais no celular sempre que surgir uma nova notícia nos canais ativos de cor azul.
                             </p>
 
-                            <div className="space-y-1.5 flex flex-col">
+                            <div className="space-y-2 flex flex-col">
                                 {activeAlerts.length === 0 ? (
-                                    <em className="text-xs text-gray-400 block py-6 text-center bg-white rounded-xl border border-gray-200">Nenhum alerta ativo.</em>
+                                    <em className="text-xs text-gray-400 block py-8 text-center bg-white rounded-xl border border-gray-200 shadow-sm">Nenhum alerta ativo.</em>
                                 ) : (
-                                    activeAlerts.map((al) => {
+                                    activeAlerts.map(al => {
+                                        const subname = al.split(":::")[1] || al;
                                         return (
-                                            <div key={al} className="bg-white border border-gray-205 p-2.5 rounded-xl flex items-center justify-between shadow-sm">
+                                            <div key={al} className="bg-white border border-gray-200 p-3 rounded-xl flex items-center justify-between shadow-sm">
                                                 <div className="flex flex-col gap-0.5 text-left">
-                                                    <span className="text-xs font-bold text-gray-800">{al}</span>
+                                                    <span className="text-xs font-bold text-gray-800">{subname}</span>
                                                     <span className="text-[9px] font-mono text-gray-400">Notificará imediatamente</span>
                                                 </div>
                                                 <button
-                                                    onClick={() => toggleAlert(al)}
-                                                    className="text-[10px] text-red-500 hover:text-red-700 font-bold hover:underline cursor-pointer"
+                                                    onClick={() => {
+                                                        setActiveAlerts(prev => prev.filter(a => a !== al));
+                                                    }}
+                                                    className="text-[10.5px] text-red-500 hover:text-red-700 font-bold hover:underline cursor-pointer"
                                                 >
                                                     Desativar
                                                 </button>
@@ -427,92 +524,187 @@
                         </div>
                     )}
 
-                    {/* BOTTOM SHEET DE FILTROS COM CHECKBOXES CIRCULARES */}
-                    {isBottomSheetOpen && (
-                        <div className="absolute inset-x-0 bottom-0 top-1/4 bg-white border-t border-gray-205 rounded-t-3xl z-50 flex flex-col shadow-2xl overflow-hidden font-sans text-[#202124]">
-                            {/* Header da bottom sheet */}
-                            <div className="h-12 bg-gray-50 border-b border-gray-200 flex items-center justify-between px-4 shrink-0">
-                                <div className="flex items-center gap-1.5">
-                                    <span className="w-2 h-2 rounded-full bg-blue-600"></span>
-                                    <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wide">FILTROS DAS MILHAS</span>
-                                </div>
+                    {/* MODAL MODO LEITURA PWA */}
+                    {readingPost && (
+                        <div className="absolute inset-x-0 top-0 bottom-0 bg-white z-50 flex flex-col">
+                            <div className="h-14 bg-white border-b border-gray-150 flex items-center justify-between px-2 shrink-0">
                                 <button 
-                                    onClick={() => setIsBottomSheetOpen(false)}
-                                    className="text-[10px] text-white bg-[#1a73e8] hover:bg-blue-700 px-3 py-1 rounded-md transition font-bold cursor-pointer"
+                                    onClick={() => setReadingPost(null)}
+                                    style={{ width: "44px", height: "44px" }}
+                                    className="flex items-center justify-center text-gray-650 hover:text-gray-950 hover:bg-gray-100 rounded-full transition active:scale-95 shrink-0"
                                 >
-                                    Aplicar
+                                    <svg className="w-5 h-5 text-blue-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
                                 </button>
+                                
+                                <div className="text-center max-w-[170px]">
+                                    <span className="text-[9px] text-[#1a73e8] font-bold block">POINT DAS MILHAS</span>
+                                    <span className="text-[10px] font-bold text-gray-900 block truncate leading-none mt-0.5">{readingPost.title}</span>
+                                </div>
+
+                                <a 
+                                    href={readingPost.url || readingPost.link}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-[10px] text-blue-600 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded font-bold transition shrink-0"
+                                >
+                                    Abrir Link
+                                </a>
                             </div>
 
-                            {/* Conteúdo interno da bottom sheet */}
-                            <div className="flex-1 overflow-y-auto p-3 space-y-2.5">
-                                {filterTree.map(item => {
-                                    return (
-                                        <div key={item.categoria} className="flex flex-col gap-1">
-                                            {/* Linha da Categoria-mãe */}
-                                            <div className="flex items-center justify-between bg-gray-50 p-1.5 rounded-xl border border-gray-200">
-                                                <button
-                                                    onClick={() => toggleCategory(item.categoria)}
-                                                    style={{ width: "36px", height: "36px" }}
-                                                    className="flex items-center justify-center shrink-0 cursor-pointer"
-                                                >
-                                                    <div className={"w-6 h-6 rounded-full border transition-all flex items-center justify-center " + (
-                                                        item.selected 
-                                                            ? "bg-blue-600 border-blue-700 text-white font-black" 
-                                                            : "bg-white border-gray-300 text-transparent"
-                                                    )}>
-                                                        ✓
-                                                    </div>
-                                                </button>
+                            <div className="flex-1 bg-white overflow-hidden relative flex flex-col justify-between">
+                                <div className="bg-blue-50 text-blue-900 p-2.5 text-[10px] border-b border-blue-105 text-left shrink-0">
+                                    <div className="flex items-start gap-1">
+                                        <svg className="w-3.5 h-3.5 text-blue-600 shrink-0 mt-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+                                        <span className="leading-relaxed font-semibold">Se o site carregar em branco nessa visualização, clique no botão 'Abrir Link' à direita para abrir no navegador.</span>
+                                    </div>
+                                </div>
+                                
+                                <iframe 
+                                    src={readingPost.url || readingPost.link}
+                                    className="flex-1 w-full border-none h-full bg-gray-50"
+                                    sandbox="allow-scripts allow-same-origin allow-popups"
+                                />
+                            </div>
+                        </div>
+                    )}
 
-                                                <div className="flex-1 pl-1.5 text-left select-none">
-                                                    <span className="text-[12px] font-bold text-gray-900 block">{item.categoria}</span>
-                                                    <span className="text-[9px] text-gray-500 block mt-0.5">
-                                                        {item.activeSubs.length} de {item.subcategorias.length} marcados
-                                                    </span>
-                                                </div>
-                                            </div>
+                    {/* BARRA DE NAVEGAÇÃO INFERIOR FIXA - GRID DE 2 COLUNAS */}
+                    <nav className="absolute bottom-0 inset-x-0 h-14 bg-white border-t border-gray-150 grid grid-cols-2 items-center justify-items-center z-40 rounded-b-[34px] px-4 shrink-0 shadow-md text-[#0f3a5f]">
+                        <button 
+                            onClick={() => { setActiveScreen("feed"); setIsBottomSheetOpen(false); }}
+                            className="w-full h-full flex flex-col items-center justify-center gap-1 transition"
+                        >
+                            <svg className={"w-4.5 h-4.5 " + (activeScreen === "feed" ? "text-[#0f3a5f]" : "text-[#0f3a5f]/50")} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20M4 19.5A2.5 2.5 0 0 1 2 17M4 19.5V4A2.5 2.5 0 0 1 6.5 1.5H20v13H6.5"/></svg>
+                            <span className={"text-[10px] font-extrabold " + (activeScreen === "feed" ? "bg-gradient-to-r from-[#0f3a5f] to-[#1d4ed8] bg-clip-text text-transparent" : "text-[#0f3a5f]/50")}>Notícias</span>
+                        </button>
+                        
+                        <button 
+                            onClick={() => { setActiveScreen("alerts"); setIsBottomSheetOpen(false); }}
+                            className="w-full h-full flex flex-col items-center justify-center gap-1 transition"
+                        >
+                            <div className="relative">
+                                <svg className={"w-4.5 h-4.5 " + (activeScreen === "alerts" ? "text-[#0f3a5f]" : "text-[#0f3a5f]/50")} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+                                {activeAlerts.length > 0 && (
+                                    <span className="absolute -top-1.5 -right-1.5 w-2.5 h-2.5 bg-red-500 text-white font-black text-[7px] flex items-center justify-center rounded-full border border-white">
+                                        {activeAlerts.length}
+                                    </span>
+                                )}
+                            </div>
+                            <span className={"text-[10px] font-extrabold " + (activeScreen === "alerts" ? "bg-gradient-to-r from-[#0f3a5f] to-[#1d4ed8] bg-clip-text text-transparent" : "text-[#0f3a5f]/50")}>Alertas</span>
+                        </button>
+                    </nav>
 
-                                            {/* Subcategorias */}
-                                            <div className="pl-3.5 space-y-0.5 border-l border-gray-200 ml-4 pt-1 flex flex-col">
-                                                {item.subcategorias.map(sub => {
-                                                    const active = item.activeSubs.includes(sub);
-                                                    const alerted = activeAlerts.includes(sub);
-                                                    return (
-                                                        <div key={sub} className="flex items-center justify-between py-1 border-b border-gray-150">
-                                                            <div className="flex items-center gap-2">
-                                                                <button
-                                                                    onClick={() => toggleSubcategory(item.categoria, sub)}
-                                                                    style={{ width: "32px", height: "32px" }}
-                                                                    className="flex items-center justify-center cursor-pointer"
-                                                                >
-                                                                    <div className={"w-5 h-5 rounded-full border transition-all flex items-center justify-center " + (
-                                                                        active 
-                                                                            ? "bg-blue-600 border-blue-700 text-white font-bold text-xs" 
-                                                                            : "bg-white border-gray-300 text-transparent"
-                                                                    )}>
-                                                                        ✓
-                                                                    </div>
-                                                                </button>
-                                                                <span className="text-[11px] text-gray-700 font-medium">{sub}</span>
+                    {/* FILTROS DRAWER À DIREITA COBRINDO 80% DA TELA */}
+                    {isBottomSheetOpen && (
+                        <div className="absolute inset-0 z-50 flex overflow-hidden font-sans text-gray-900 rounded-[34px]">
+                            {/* Left 20% overlay */}
+                            <div 
+                                className="w-[20%] h-full bg-black/40 backdrop-blur-[2px] cursor-pointer"
+                                onClick={() => setIsBottomSheetOpen(false)}
+                            />
+                            
+                            {/* Right 80% drawer */}
+                            <div className="w-[80%] h-full bg-white flex flex-col shadow-2xl border-l border-gray-200 overflow-hidden pt-6">
+                                <div className="h-14 bg-gray-50 border-b border-gray-200 flex items-center justify-between px-4 shrink-0">
+                                    <div className="flex items-center gap-1.5">
+                                        <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse" />
+                                        <span className="text-[11px] font-bold text-gray-700 tracking-wide font-sans">FILTROS DAS MILHAS</span>
+                                    </div>
+                                    <button
+                                        onClick={() => setIsBottomSheetOpen(false)}
+                                        className="text-[10px] text-gray-500 hover:text-gray-950 border border-gray-300 bg-white hover:bg-gray-100 px-2.5 py-1 rounded-md transition font-semibold"
+                                    >
+                                        Fechar
+                                    </button>
+                                </div>
+
+                                <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                                    <div className="bg-blue-50 text-blue-900 p-3 text-[11px] rounded-xl border border-blue-100 flex items-start gap-1.5 mb-2 leading-relaxed font-semibold">
+                                        <svg className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+                                        <span>Selecione as subcategorias desejadas. A filtragem é atualizada instantaneamente!</span>
+                                    </div>
+
+                                    {filterTree.length === 0 ? (
+                                        <div className="py-8 text-center text-gray-400 text-xs font-semibold">Nenhum dado encontrado para filtrar...</div>
+                                    ) : (
+                                        filterTree.map(item => {
+                                            const theme = getCategoryTheme(item.categoria);
+                                            return (
+                                                <div key={item.categoria} className="flex flex-col gap-1 border-b border-gray-150 pb-2.5">
+                                                    {/* Parent category */}
+                                                    <div className="flex items-center justify-between bg-gray-50/80 p-1.5 rounded-xl border border-gray-200 shadow-sm">
+                                                        <button
+                                                            onClick={() => toggleCategory(item.categoria)}
+                                                            style={{ width: "36px", height: "36px" }}
+                                                            className="flex items-center justify-center shrink-0 cursor-pointer bg-transparent border-none"
+                                                        >
+                                                            <div className={"w-6.5 h-6.5 rounded-full border transition-all flex items-center justify-center " + (
+                                                                item.selected ? theme.checkbox + " text-white" : "bg-white border-gray-300"
+                                                            )}>
+                                                                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="20 6 9 17 4 12"/></svg>
                                                             </div>
+                                                        </button>
 
-                                                            <button
-                                                                onClick={() => toggleAlert(sub)}
-                                                                style={{ width: "32px", height: "32px" }}
-                                                                className={"flex items-center justify-center cursor-pointer transition " + (
-                                                                    alerted ? "text-blue-600" : "text-gray-400 hover:text-gray-600"
-                                                                )}
-                                                            >
-                                                                🔔
-                                                            </button>
+                                                        <div 
+                                                            className="flex-1 pl-2 text-left select-none flex items-center gap-1.5 cursor-pointer"
+                                                            onClick={() => {
+                                                                setFilterTree(prev => prev.map(f => f.categoria === item.categoria ? { ...f, isOpen: !f.isOpen } : f));
+                                                            }}
+                                                        >
+                                                            <span className={"w-2 h-2 rounded-full shrink-0 " + theme.dot} />
+                                                            <div>
+                                                                <span className="text-[12.5px] font-bold text-gray-900 block leading-tight">{item.categoria}</span>
+                                                                <span className="text-[10px] text-gray-500 block">{item.activeSubs.length} de {item.subcategorias.length} marcados</span>
+                                                            </div>
                                                         </div>
-                                                    );
-                                                })}
-                                            </div>
-                                        </div>
-                                    );
-                                })}
+                                                    </div>
+
+                                                    {/* Subcategories list */}
+                                                    {item.isOpen && (
+                                                        <div className="pl-3.5 space-y-1.5 border-l border-gray-200 ml-4.5 pt-1.5">
+                                                            {item.subcategorias.map(sub => {
+                                                                const active = item.activeSubs.includes(sub);
+                                                                const alerted = activeAlerts.includes(item.categoria + ":::" + sub);
+                                                                const checkboxColorClass = getSubCheckboxColor(sub, item.categoria);
+                                                                return (
+                                                                    <div key={sub} className="flex items-center justify-between py-1 border-b border-gray-50">
+                                                                        <div className="flex items-center">
+                                                                            <button
+                                                                                onClick={() => toggleSubcategory(item.categoria, sub)}
+                                                                                style={{ width: "32px", height: "32px" }}
+                                                                                className="flex items-center justify-center cursor-pointer bg-transparent border-none"
+                                                                            >
+                                                                                <div className={"w-5 h-5 rounded-full border transition-all flex items-center justify-center " + (
+                                                                                    active ? checkboxColorClass + " text-white" : "bg-white border-gray-300"
+                                                                                )}>
+                                                                                    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5"><polyline points="20 6 9 17 4 12"/></svg>
+                                                                                </div>
+                                                                            </button>
+                                                                            <span className="text-xs text-gray-700 font-semibold pl-1.5 leading-snug">{sub}</span>
+                                                                        </div>
+
+                                                                        <button
+                                                                            onClick={() => {
+                                                                                const alertKey = item.categoria + ":::" + sub;
+                                                                                setActiveAlerts(prev => prev.includes(alertKey) ? prev.filter(a => a !== alertKey) : [...prev, alertKey]);
+                                                                            }}
+                                                                            style={{ width: "32px", height: "32px" }}
+                                                                            className={"flex items-center justify-center rounded-full transition " + (
+                                                                                alerted ? "text-red-500 bg-red-50" : "text-gray-400 hover:text-gray-600 hover:bg-gray-100"
+                                                                            )}
+                                                                        >
+                                                                            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+                                                                        </button>
+                                                                    </div>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            );
+                                        })
+                                    )}
+                                </div>
                             </div>
                         </div>
                     )}
@@ -528,7 +720,7 @@
             if (window.lucide) {
                 window.lucide.createIcons();
             }
-        }, 800);
+        }, 805);
     </script>
 </body>
 </html>
