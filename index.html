@@ -3,21 +3,24 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Point das Milhas | PWA</title>
+    <title>Point das Milhas | App Mobile</title>
     
-    <!-- Meta tags PWA -->
+    <!-- Meta tags PWA / Tela Cheia -->
+    <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Point Milhas">
     <meta name="theme-color" content="#0f3a5f">
+    <link rel="manifest" href="./manifest.json">
     
     <link rel="icon" type="image/png" href="https://ais-dev-er44kh4o5vh7gueuj6tubg-427304860856.us-west2.run.app/assets/images/Icone_Point.PNG">
+    <link rel="apple-touch-icon" href="https://ais-dev-er44kh4o5vh7gueuj6tubg-427304860856.us-west2.run.app/assets/images/Icone_Point.PNG">
 
-    <!-- Bibliotecas Necessárias via CDN -->
+    <!-- Bibliotecas via CDN -->
     <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- @supabase/supabase-js cliente oficial -->
     <script src="https://unpkg.com/@supabase/supabase-js@2.39.8/dist/umd/supabase.js"></script>
     
     <script>
@@ -25,19 +28,16 @@
             theme: {
                 extend: {
                     colors: {
-                        brand: {
-                            dark: '#0f3a5f',
-                            medium: '#1d4ed8'
-                        }
+                        brand: { dark: '#0f3a5f', blue: '#1a73e8' }
                     },
                     animation: {
-                        'fade-in': 'fadeIn 0.3s ease-out forwards',
-                        'slide-up': 'slideUp 0.4s ease-out forwards',
-                        'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                        'fade-in': 'fadeIn 0.2s ease-out forwards',
+                        'slide-left': 'slideLeft 0.3s cubic-bezier(0, 0, 0.2, 1) forwards',
+                        'pulse-slow': 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
                     },
                     keyframes: {
                         fadeIn: { 'from': { opacity: '0' }, 'to': { opacity: '1' } },
-                        slideUp: { 'from': { transform: 'translateY(20px)', opacity: '0' }, 'to': { transform: 'translateY(0)', opacity: '1' } }
+                        slideLeft: { 'from': { transform: 'translateX(100%)' }, 'to': { transform: 'translateX(0)' } }
                     }
                 }
             }
@@ -46,62 +46,61 @@
     
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
-        
         body {
             -webkit-tap-highlight-color: transparent;
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            margin: 0;
-            padding: 0;
-            background-color: #F8F9FA;
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            margin: 0; padding: 0;
+            background-color: #f3f4f6;
             overflow: hidden;
             user-select: none;
             -webkit-user-select: none;
         }
-        
-        /* Ajuste para Notch e Safe Areas */
-        @supports (padding: env(safe-area-inset-top)) {
-            .safe-pt { padding-top: env(safe-area-inset-top); }
-            .safe-pb { padding-bottom: env(safe-area-inset-bottom); }
-            .safe-h { height: calc(100% + env(safe-area-inset-bottom)); }
-        }
-
-        /* Ocultar barra de rolagem estética */
-        ::-webkit-scrollbar {
-            width: 4px;
-        }
-        ::-webkit-scrollbar-track {
-            background: #F8F9FA;
-        }
-        ::-webkit-scrollbar-thumb {
-            background: #cbd5e1;
-            border-radius: 99px;
-        }
-        .scrollbar-none::-webkit-scrollbar {
-            display: none;
-        }
-        
+        .safe-pb { padding-bottom: env(safe-area-inset-bottom); }
+        .pt-safe { padding-top: env(safe-area-inset-top); }
+        ::-webkit-scrollbar { display: none; }
         .line-clamp-2 {
             display: -webkit-box;
             -webkit-line-clamp: 2;
             -webkit-box-orient: vertical;
             overflow: hidden;
         }
-
-        /* Estilo para simular iFrame ou WebView de forma fluida */
-        #webview-container {
-            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        }
     </style>
+
+    <script>
+      // Registro do Service Worker e Permissão de Notificação
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('./sw.js').then(reg => {
+            console.log('SW registrado com sucesso');
+            if ('Notification' in window && Notification.permission === 'default') {
+              Notification.requestPermission();
+            }
+          }).catch(err => console.log('Erro ao registrar SW:', err));
+        });
+      }
+    </script>
 </head>
-<body class="bg-[#F8F9FA] text-black antialiased">
+<body class="antialiased">
     <div id="root"></div>
 
     <script type="text/babel">
         const { useState, useEffect, useRef, useMemo } = React;
 
-        // CREDENCIAIS DO SUPABASE INJETADAS
         const SUPABASE_URL = "https://pifarsxbrfwvmvlwvtnk.supabase.co";
         const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBpZmFyc3hicmZ3dm12bHd2dG5rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk2NDg0OTYsImV4cCI6MjA5NTIyNDQ5Nn0.xrgI7q8z0Yew70kxZzWz4v8IiF_eHSY97Ed2NxvTwWw";
+        const VAPID_PUBLIC_KEY = "BOmW8M6X3P7z7v9Hk2J4L5N6Q7R8S9T0U1V2W3X4Y5Z6A7B8C9D0E1F2G3H4I5J6K7L8M9N0O1P2Q3R4S5T6U7V8W9X0Y1Z";
+
+        // Ícones em SVG do Lucide para evitar carregar biblioteca extra
+        const Icons = {
+            Bell: () => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>,
+            Check: () => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>,
+            ChevronDown: () => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"/></svg>,
+            Settings: () => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.1a2 2 0 0 1-1-1.72v-.51a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>,
+            ExternalLink: () => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>,
+            Star: ({fill}) => <svg width="24" height="24" viewBox="0 0 24 24" fill={fill || "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>,
+            Filter: () => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>,
+            Info: () => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+        };
 
         function App() {
             const [posts, setPosts] = useState([]);
@@ -109,595 +108,217 @@
             const [activeScreen, setActiveScreen] = useState("feed");
             const [isBottomSheetOpen, setIsBottomSheetOpen] = useState(false);
             const [readingPost, setReadingPost] = useState(null);
-            const [lastRefreshTime, setLastRefreshTime] = useState(new Date().toLocaleTimeString('pt-BR'));
-            const [secondsToRefresh, setSecondsToRefresh] = useState(1200);
-            
-            // Gestão de Favoritos local storage na PWA
-            const [favorites, setFavorites] = useState(() => {
-                try {
-                    return JSON.parse(localStorage.getItem("point_feed_favorites") || "[]");
-                } catch {
-                    return [];
-                }
-            });
-
-            const toggleFavorite = (postUrl, e) => {
-                if (e) e.stopPropagation();
-                setFavorites(prev => {
-                    const next = prev.includes(postUrl) ? prev.filter(p => p !== postUrl) : [...prev, postUrl];
-                    localStorage.setItem("point_feed_favorites", JSON.stringify(next));
-                    return next;
-                });
-            };
-
-            // Gestos para Puxar e Atualizar (Pull to Refresh) na PWA
             const [pullDistance, setPullDistance] = useState(0);
+            const [favorites, setFavorites] = useState(() => JSON.parse(localStorage.getItem("point_pwa_favs") || "[]"));
+            const [activeAlerts, setActiveAlerts] = useState(() => JSON.parse(localStorage.getItem("point_pwa_alerts") || "[]"));
+            const [filterTree, setFilterTree] = useState([]);
+
             const touchStartY = useRef(0);
             const containerRef = useRef(null);
 
-            const handleTouchStart = (e) => {
-                const isAtTop = containerRef.current ? containerRef.current.scrollTop === 0 : true;
-                if (isAtTop) {
-                    touchStartY.current = e.touches[0].clientY;
-                } else {
-                    touchStartY.current = -1;
-                }
-            };
+            useEffect(() => { localStorage.setItem("point_pwa_favs", JSON.stringify(favorites)); }, [favorites]);
+            useEffect(() => { localStorage.setItem("point_pwa_alerts", JSON.stringify(activeAlerts)); }, [activeAlerts]);
 
-            const handleTouchMove = (e) => {
-                if (touchStartY.current === -1) return;
-                const currentY = e.touches[0].clientY;
-                const diff = currentY - touchStartY.current;
-                if (diff > 0) {
-                    const pull = Math.min(diff * 0.4, 80);
-                    setPullDistance(pull);
-                }
-            };
-
-            const handleTouchEnd = () => {
-                if (pullDistance >= 50) {
-                    fetchNewsFromSupabase();
-                }
-                setPullDistance(0);
-            };
-
-            const [filterTree, setFilterTree] = useState([]);
-            const [activeAlerts, setActiveAlerts] = useState(() => {
-                try {
-                  return JSON.parse(localStorage.getItem("point_pwa_alerts") || "[]");
-                } catch { return []; }
-            });
-
-            useEffect(() => {
-              localStorage.setItem("point_pwa_alerts", JSON.stringify(activeAlerts));
-            }, [activeAlerts]);
-
-            // Configurações de Categorias Fies ao App Original e ao CSV
             const categoryConfigs = useMemo(() => [
-              { ordem: 10, cat: "Transferência Bonificada", subs: ["Smiles", "Latam", "Azul", "Avios", "Aadvantage", "Outros"] },
-              { ordem: 20, cat: "Alteração de regras", subs: ["Smiles", "Latam", "Azul", "Avios", "Aadvantage", "Outros"] },
-              { ordem: 30, cat: "Passagem com milhas", subs: ["Smiles", "Latam", "Azul", "Avios", "Aadvantage", "Outros"] },
-              { ordem: 40, cat: "Passagem em dinheiro", subs: ["Brasil", "América do sul", "Caribe", "América do norte", "Europa", "Ásia", "África", "Oceania"] },
-              { ordem: 50, cat: "Hotel", subs: ["Accor", "Marriott", "Hilton", "Hyatt", "Wyndham", "IHG", "Radisson", "Outros"] },
-              { ordem: 60, cat: "Cartão de crédito", subs: ["Itaú", "Santander", "Bradesco", "Banco do Brasil", "Porto Bank", "Caixa", "C6 Bank", "XP e Rico", "Outros", "Anuidade grátis"] },
-              { ordem: 80, cat: "Status match ou gratuito", subs: [] }
+                { ordem: 10, cat: "Transferência Bonificada", subs: ["Smiles", "Latam", "Azul", "Avios", "Aadvantage", "Outros"] },
+                { ordem: 20, cat: "Alteração de regras", subs: ["Smiles", "Latam", "Azul", "Avios", "Aadvantage", "Outros"] },
+                { ordem: 30, cat: "Passagem com milhas", subs: ["Smiles", "Latam", "Azul", "Avios", "Aadvantage", "Outros"] },
+                { ordem: 40, cat: "Passagem em dinheiro", subs: ["Brasil", "América do sul", "Caribe", "América do norte", "Europa", "Ásia", "África", "Oceania"] },
+                { ordem: 50, cat: "Hotel", subs: ["Accor", "Marriott", "Hilton", "Hyatt", "Wyndham", "IHG", "Radisson", "Outros"] },
+                { ordem: 60, cat: "Cartão de crédito", subs: ["Itaú", "Santander", "Bradesco", "Banco do Brasil", "Porto Bank", "Caixa", "C6 Bank", "XP e Rico", "Outros", "Anuidade grátis"] },
+                { ordem: 80, cat: "Status match ou gratuito", subs: [] }
             ], []);
 
-            useEffect(() => {
-                fetchNewsFromSupabase();
-                const interval = setInterval(() => {
-                    setSecondsToRefresh(prev => {
-                        if (prev <= 1) {
-                            fetchNewsFromSupabase();
-                            return 1200;
-                        }
-                        return prev - 1;
-                    });
-                }, 1000);
-                return () => clearInterval(interval);
-            }, []);
+            useEffect(() => { fetchData(); }, []);
 
             useEffect(() => {
                 const found = {};
                 posts.forEach(p => {
-                    const cat = p.categoria;
-                    const sub = p.subcategoria;
-                    if (!cat) return;
-                    const c = cat.trim();
-                    const s = sub ? sub.trim() : "Geral";
-                    if (c.toLowerCase() === "ignorado" || s.toLowerCase() === "ignorado") return;
+                    const c = (p.categoria || "").trim();
+                    const s = (p.subcategoria || "Geral").trim();
+                    if (!c || c.toLowerCase() === "ignorado") return;
                     if (!found[c]) found[c] = [];
                     if (!found[c].includes(s)) found[c].push(s);
                 });
 
-                setFilterTree(prevTree => {
-                    return categoryConfigs.map(config => {
-                        const cat = config.cat;
-                        const subsInDb = found[cat] || [];
-                        const allSubs = Array.from(new Set([...config.subs, ...subsInDb]));
-                        
-                        const sortedSubs = allSubs.sort((a, b) => {
-                            const idxA = config.subs.indexOf(a);
-                            const idxB = config.subs.indexOf(b);
-                            if (idxA !== -1 && idxB !== -1) return idxA - idxB;
-                            if (idxA !== -1) return -1;
-                            if (idxB !== -1) return 1;
-                            return a.localeCompare(b);
-                        });
-
-                        const existing = prevTree.find(item => item.categoria.toLowerCase() === cat.toLowerCase());
-                        if (existing) {
-                            const validActiveSubs = existing.activeSubs.filter(sub => 
-                                sortedSubs.some(s => s.toLowerCase() === sub.toLowerCase())
-                            );
-                            sortedSubs.forEach(sub => {
-                                if (!existing.subcategorias.some(s => s.toLowerCase() === sub.toLowerCase())) {
-                                    validActiveSubs.push(sub);
-                                }
-                            });
-                            return {
-                                categoria: cat,
-                                subcategorias: sortedSubs,
-                                isOpen: existing.isOpen,
-                                selected: validActiveSubs.length === sortedSubs.length,
-                                activeSubs: validActiveSubs
-                            };
-                        } else {
-                            return {
-                                categoria: cat,
-                                subcategorias: sortedSubs,
-                                isOpen: true,
-                                selected: true,
-                                activeSubs: [...sortedSubs]
-                            };
-                        }
-                    });
+                const newTree = categoryConfigs.map(config => {
+                    const subsInDb = found[config.cat] || [];
+                    const allSubs = Array.from(new Set([...config.subs, ...subsInDb]));
+                    const sortedSubs = allSubs.sort((a,b) => config.subs.indexOf(a) - config.subs.indexOf(b));
+                    return {
+                        categoria: config.cat,
+                        subcategorias: sortedSubs,
+                        isOpen: true,
+                        selected: true,
+                        activeSubs: [...sortedSubs]
+                    };
                 });
+                setFilterTree(newTree);
             }, [posts, categoryConfigs]);
 
-            const fetchNewsFromSupabase = async () => {
+            const fetchData = async () => {
                 setIsLoading(true);
                 try {
-                    const isConfigured = SUPABASE_URL && !SUPABASE_URL.includes("SUA_URL");
-                    if (isConfigured) {
-                        const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-                        const { data, error } = await sb
-                            .from("news")
-                            .select("*")
-                            .order("published_at", { ascending: false })
-                            .limit(100);
-                        
-                        if (error) throw error;
-                        if (data) {
-                            setPosts(data);
-                            setLastRefreshTime(new Date().toLocaleTimeString('pt-BR'));
-                        }
-                    } else {
-                        // Resiliência: Tenta buscar do backend se falhar URL
-                        try {
-                          const res = await fetch("/api/wp-recent");
-                          const data = await res.json();
-                          if (data.posts) {
-                             setPosts(data.posts);
-                             setLastRefreshTime(new Date().toLocaleTimeString('pt-BR'));
-                          }
-                        } catch(err) {
-                           console.error("Fallback failed", err);
-                        }
-                    }
-                } catch(e) {
-                    console.error("Falha ao recuperar notícias", e);
-                } finally {
-                    setIsLoading(false);
-                }
+                    const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+                    const { data } = await sb.from("news").select("*").order("published_at", { ascending: false }).limit(60);
+                    if (data) setPosts(data);
+                } catch(e) { console.error(e); }
+                setIsLoading(false);
             };
 
-            const toggleCategory = (catName) => {
-                setFilterTree(prev => prev.map(item => {
-                    if (item.categoria === catName) {
-                        const next = !item.selected;
-                        return { ...item, selected: next, activeSubs: next ? [...item.subcategorias] : [] };
-                    }
-                    return item;
-                }));
+            const subscribeToPush = async (cat, sub) => {
+                if (!('serviceWorker' in navigator)) return;
+                try {
+                    const reg = await navigator.serviceWorker.ready;
+                    const subscr = await reg.pushManager.subscribe({
+                        userVisibleOnly: true,
+                        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+                    });
+                    const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+                    await sb.from("push_subscriptions").upsert({
+                        subscription: subscr, category: cat, subcategory: sub, updated_at: new Date().toISOString()
+                    }, { onConflict: 'subscription' });
+                } catch(e) { console.error("Push Error", e); }
             };
 
-            const toggleSubcategory = (catName, subName) => {
-                setFilterTree(prev => prev.map(item => {
-                    if (item.categoria === catName) {
-                        const active = item.activeSubs.includes(subName);
-                        const nextSubs = active ? item.activeSubs.filter(s => s !== subName) : [...item.activeSubs, subName];
-                        return { ...item, activeSubs: nextSubs, selected: nextSubs.length === item.subcategorias.length };
-                    }
-                    return item;
-                }));
+            const urlBase64ToUint8Array = (base64String) => {
+                const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+                const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+                const rawData = window.atob(base64);
+                const outputArray = new Uint8Array(rawData.length);
+                for (let i = 0; i < rawData.length; ++i) outputArray[i] = rawData.charCodeAt(i);
+                return outputArray;
             };
 
-            const toggleCollapse = (catName) => {
-                setFilterTree(prev => prev.map(item => 
-                    item.categoria === catName ? { ...item, isOpen: !item.isOpen } : item
-                ));
-            };
-
-            const toggleAlert = (categoryName, subName, e) => {
-                if (e) e.stopPropagation();
-                const alertKey = categoryName.trim() + ":::" + subName.trim();
-                setActiveAlerts(prev => prev.includes(alertKey) ? prev.filter(a => a !== alertKey) : [...prev, alertKey]);
-            };
-
-            const getFilteredPosts = () => {
-                return posts.filter(p => {
-                    const cat = (p.categoria || "").trim();
-                    const sub = (p.subcategoria || "").trim();
-                    if (cat.toLowerCase() === "ignorado" || sub.toLowerCase() === "ignorado") return false;
-
-                    const matchedCat = filterTree.find(item => item.categoria.toLowerCase().trim() === cat.toLowerCase().trim());
-                    if (!matchedCat) return true;
-                    if (!p.subcategoria) return matchedCat.activeSubs.length > 0;
-                    return matchedCat.activeSubs.some(s => s.toLowerCase().trim() === sub.toLowerCase().trim());
-                }).sort((a, b) => {
-                    const keyA = a.link || a.url || a.id;
-                    const keyB = b.link || b.url || b.id;
-                    const aFav = favorites.includes(keyA);
-                    const bFav = favorites.includes(keyB);
-                    if (aFav && !bFav) return -1;
-                    if (!aFav && bFav) return 1;
-                    return new Date(b.published_at).getTime() - new Date(a.published_at).getTime();
-                });
+            const toggleAlert = async (cat, sub, e) => {
+                if(e) e.stopPropagation();
+                const key = cat + ":::" + sub;
+                const willEnable = !activeAlerts.includes(key);
+                if (willEnable) await subscribeToPush(cat, sub);
+                setActiveAlerts(prev => prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]);
             };
 
             const getCategoryTheme = (categoryName) => {
-                const defaultStyle = {
-                    badge: "bg-blue-50 text-blue-700 border border-blue-150/60",
-                    dot: "bg-blue-600",
-                    border: "border-blue-200",
-                    checkbox: "bg-blue-600 border-blue-600",
-                    text: "text-blue-600",
-                    bgLight: "bg-blue-50"
-                };
-                const name = (categoryName || "Geral").trim();
-                const lower = name.toLowerCase();
-
-                if (lower.includes("transferência bonificada") || lower.includes("transfência bonificada")) {
-                    return {
-                        badge: "bg-emerald-50 text-[#15803d] border border-emerald-200/80 font-extrabold",
-                        dot: "bg-emerald-600",
-                        border: "border-emerald-300",
-                        checkbox: "bg-emerald-600 border-emerald-600",
-                        text: "text-[#15803d]",
-                        bgLight: "bg-emerald-50"
-                    };
-                }
-                if (lower.includes("passagem em dinheiro")) {
-                    return {
-                        badge: "bg-blue-50 text-[#1a73e8] border border-blue-200 font-extrabold",
-                        dot: "bg-blue-600",
-                        border: "border-blue-300",
-                        checkbox: "bg-blue-600 border-blue-600",
-                        text: "text-[#1a73e8]",
-                        bgLight: "bg-blue-50"
-                    };
-                }
-                if (lower.includes("cartão") || lower.includes("cartao") || lower.includes("credito") || lower.includes("crédito")) {
-                    return {
-                        badge: "bg-orange-50 text-orange-700 border border-orange-200 font-bold",
-                        dot: "bg-orange-600",
-                        border: "border-orange-300",
-                        checkbox: "bg-orange-600 border-orange-600",
-                        text: "text-orange-700",
-                        bgLight: "bg-orange-50"
-                    };
-                }
-                if (lower.includes("hotel") || lower.includes("hotéis") || lower.includes("hoteis")) {
-                    return {
-                        badge: "bg-purple-50 text-purple-700 border border-purple-200/80 font-extrabold",
-                        dot: "bg-purple-600",
-                        border: "border-purple-300",
-                        checkbox: "bg-purple-600 border-purple-600",
-                        text: "text-purple-700",
-                        bgLight: "bg-purple-50"
-                    };
-                }
-                if (lower.includes("alteração") || lower.includes("regras")) {
-                   return {
-                      badge: "bg-red-50 text-red-700 border border-red-200/80 font-bold",
-                      dot: "bg-red-600",
-                      border: "border-red-300",
-                      checkbox: "bg-red-600 border-red-600",
-                      text: "text-red-700",
-                      bgLight: "bg-red-50"
-                   };
-                }
-                if (lower.includes("passagem com milhas")) {
-                   return {
-                      badge: "bg-blue-50 text-blue-700 border border-blue-200/80 font-bold",
-                      dot: "bg-blue-600",
-                      border: "border-blue-300",
-                      checkbox: "bg-blue-600 border-blue-600",
-                      text: "text-blue-700",
-                      bgLight: "bg-blue-50"
-                   };
-                }
-
-                const styles = [
-                    { badge: "bg-blue-50 text-[#1a73e8] border border-blue-200", dot: "bg-blue-600", border: "border-blue-300", checkbox: "bg-blue-600", text: "text-blue-600", bgLight: "bg-blue-50" },
-                    { badge: "bg-emerald-50 text-emerald-700 border border-emerald-200", dot: "bg-emerald-600", border: "border-emerald-300", checkbox: "bg-emerald-600", text: "text-emerald-700", bgLight: "bg-emerald-50" },
-                    { badge: "bg-orange-50 text-orange-700 border border-orange-200", dot: "bg-orange-600", border: "border-orange-300", checkbox: "bg-orange-600", text: "text-orange-700", bgLight: "bg-orange-50" },
-                    { badge: "bg-purple-50 text-purple-700 border border-purple-200", dot: "bg-purple-600", border: "border-purple-300", checkbox: "bg-purple-600", text: "text-purple-700", bgLight: "bg-purple-50" },
-                    { badge: "bg-pink-50 text-pink-700 border border-pink-200", dot: "bg-pink-600", border: "border-pink-300", checkbox: "bg-pink-600", text: "text-pink-700", bgLight: "bg-pink-50" }
-                ];
-                const hash = name.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0);
-                return styles[hash % styles.length] || defaultStyle;
+                const lower = (categoryName || "").toLowerCase();
+                const green = { badge: "bg-emerald-50 text-[#15803d] border border-emerald-200/80 font-extrabold", dot: "bg-emerald-600", checkbox: "bg-emerald-600 border-emerald-600" };
+                const blue = { badge: "bg-blue-50 text-[#1a73e8] border border-blue-200 font-extrabold", dot: "bg-blue-600", checkbox: "bg-blue-600 border-blue-600" };
+                const orange = { badge: "bg-orange-50 text-orange-700 border border-orange-200 font-bold", dot: "bg-orange-600", checkbox: "bg-orange-600 border-orange-600" };
+                const purple = { badge: "bg-purple-50 text-purple-700 border border-purple-200/80 font-extrabold", dot: "bg-purple-600", checkbox: "bg-purple-600 border-purple-600" };
+                const red = { badge: "bg-red-50 text-red-700 border border-red-200/80 font-bold", dot: "bg-red-600", checkbox: "bg-red-600 border-red-600" };
+                
+                if (lower.includes("transferência bonificada") || lower.includes("transfência bonificada")) return green;
+                if (lower.includes("dinheiro") || lower.includes("passagem com milhas")) return blue;
+                if (lower.includes("cartão") || lower.includes("credito")) return orange;
+                if (lower.includes("hotel")) return purple;
+                if (lower.includes("alteração") || lower.includes("regras")) return red;
+                return blue;
             };
 
-            const formatSourceName = (domain) => {
-                if (!domain) return "Portal";
-                const d = String(domain).toLowerCase();
-                if (d.includes("passageirodeprimeira")) return "Passageiro de Primeira";
-                if (d.includes("pontospravoar")) return "Pontos pra Voar";
-                if (d.includes("mestredasmilhas")) return "Mestre das Milhas";
-                if (d.includes("meumilhaodemilhas")) return "Meu Milhão de Milhas";
-                if (d.includes("melhorescartoes")) return "Melhores Cartões";
-                return domain.replace(/^(https?:\/\/)?(www\.)?/, "").split("/")[0];
-            };
-
-            const getRelativeTime = (isoString) => {
-                try {
-                    const diffMs = Date.now() - new Date(isoString).getTime();
-                    const diffMins = Math.floor(diffMs / (1000 * 60));
-                    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-                    if (diffMins < 1) return "agora";
-                    if (diffMins < 60) return "há " + diffMins + "m";
-                    if (diffHours < 24) return "há " + diffHours + "h";
-                    return new Date(isoString).toLocaleDateString("pt-BR", { day: "numeric", month: "short" });
-                } catch {
-                    return "---";
-                }
-            };
+            const filteredPosts = posts.filter(p => {
+                const cat = (p.categoria || "").trim();
+                const sub = (p.subcategoria || "Geral").trim();
+                const node = filterTree.find(n => n.categoria === cat);
+                if (!node) return true;
+                return node.activeSubs.includes(sub);
+            });
 
             return (
-                <div className="flex flex-col h-[100dvh] w-full md:max-w-md mx-auto bg-[#F8F9FA] relative overflow-hidden text-left shadow-2xl">
-                    
-                    {/* CABEÇALHO STYLE GOOGLE/CLEAN */}
-                    <header className="sticky top-0 bg-white border-b border-gray-150 h-16 flex items-center justify-between px-4 z-40 shadow-sm shrink-0">
+                <div className="flex flex-col h-[100dvh] w-full md:max-w-md mx-auto bg-white relative overflow-hidden shadow-2xl">
+                    <header className="h-14 bg-white border-b border-gray-100 flex items-center justify-between px-4 sticky top-0 z-40 shrink-0 pt-safe">
                         <div className="flex items-center gap-2">
-                             <img 
-                                src="https://ais-dev-er44kh4o5vh7gueuj6tubg-427304860856.us-west2.run.app/assets/images/Icone_Point.PNG" 
-                                alt="Logo" 
-                                className="w-8 h-8 object-contain"
-                                onError={(e) => {
-                                  e.target.style.display = 'none';
-                                  e.target.nextSibling.style.display = 'block';
-                                }}
-                             />
-                            <svg style={{display:'none'}} className="w-8 h-8 text-[#0f3a5f] bg-blue-50 p-1.5 rounded-lg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                <path d="M18 10c0 5.25-6 11-6 11s-6-5.75-6-11a6 6 0 0 1 12 0z" />
-                                <path d="M14 6.5l-2.5-.5-2 2-3-.5L6 8l2.5 1.5 1.5 3 .5-.5-.5-2 2-2 1.5.5.5-.5z" fill="currentColor" stroke="none" />
-                            </svg>
-                            <span className="font-black tracking-tighter text-lg font-sans uppercase bg-gradient-to-r from-[#0f3a5f] to-[#1d4ed8] bg-clip-text text-transparent leading-none">POINT DAS MILHAS</span>
+                            <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center">
+                                <img src="https://ais-dev-er44kh4o5vh7gueuj6tubg-427304860856.us-west2.run.app/assets/images/Icone_Point.PNG" className="w-6 h-6 object-contain" />
+                            </div>
+                            <span className="font-black text-blue-900 tracking-tighter uppercase text-sm">POINT MILHAS</span>
                         </div>
-                        
-                        <button 
-                            onClick={() => setIsBottomSheetOpen(true)}
-                            className="flex items-center gap-1.5 bg-[#0f3a5f]/5 hover:bg-blue-100/50 text-[#0f3a5f] px-3.5 py-2 rounded-full text-[11px] font-black transition border border-[#0f3a5f]/10 active:scale-95 cursor-pointer"
-                        >
-                            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
-                            <span>FILTROS</span>
+                        <button onClick={() => setIsBottomSheetOpen(true)} className="p-2 bg-gray-50 rounded-full text-blue-800">
+                            <Icons.Filter />
                         </button>
                     </header>
 
-                    {/* CONTEÚDO PRINCIPAL (FEED) */}
-                    {activeScreen === "feed" && (
-                        <div 
-                            ref={containerRef}
-                            onTouchStart={handleTouchStart}
-                            onTouchMove={handleTouchMove}
-                            onTouchEnd={handleTouchEnd}
-                            className="flex-1 overflow-y-auto px-3.5 py-3.5 pb-24 scrollbar-none"
-                        >
-                            {pullDistance > 10 && (
-                                <div className="flex items-center justify-center text-gray-400 py-1 transition-all duration-150 overflow-hidden shrink-0" style={{ height: pullDistance + 'px' }}>
-                                    <span className="text-[10px] font-black text-blue-600 flex items-center gap-1.5 animate-pulse uppercase tracking-wider">
-                                        {pullDistance >= 50 ? "Solte para atualizar" : "Puxe para atualizar"}
+                    <div ref={containerRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-4 scrollbar-none pb-24">
+                        {isLoading ? (
+                            <div className="py-20 flex flex-col items-center justify-center gap-3">
+                                <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Sincronizando...</span>
+                            </div>
+                        ) : filteredPosts.map(post => (
+                            <div key={post.id} onClick={() => setReadingPost(post)} className="bg-white border border-gray-100 p-4 rounded-2xl shadow-sm active:scale-[0.98] transition">
+                                <h3 className="text-sm font-extrabold text-gray-900 leading-snug mb-2">{post.title}</h3>
+                                <div className="flex items-center justify-between text-[10px] font-bold text-gray-400 uppercase mb-3">
+                                    <span>{post.source_site}</span>
+                                    <span className="font-normal">{new Date(post.published_at).toLocaleDateString()}</span>
+                                </div>
+                                <div className="flex items-center justify-between pt-3 border-t border-gray-50">
+                                    <span className={"text-[9px] px-3 py-1 rounded-full uppercase font-black tracking-widest " + getCategoryTheme(post.categoria).badge}>
+                                        {post.categoria}
                                     </span>
+                                    <Icons.Star fill={favorites.includes(post.id) ? "#fbbf24" : "none"} />
                                 </div>
-                            )}
-
-                            {isLoading ? (
-                                <div className="py-24 flex flex-col items-center justify-center text-gray-400 text-xs animate-fade-in">
-                                    <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mb-3"></div>
-                                    <span className="font-bold uppercase tracking-widest text-[9px]">Sincronizando Feed...</span>
-                                </div>
-                            ) : getFilteredPosts().length === 0 ? (
-                                <div className="py-20 text-center flex flex-col items-center gap-4 animate-fade-in">
-                                    <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center">
-                                       <svg className="w-8 h-8 text-gray-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-                                    </div>
-                                    <p className="text-gray-500 text-xs font-bold uppercase max-w-[200px] leading-relaxed">Nenhuma notícia encontrada com os filtros selecionados.</p>
-                                    <button onClick={() => setIsBottomSheetOpen(true)} className="text-[10px] font-black text-blue-600 underline">AJUSTAR FILTROS</button>
-                                </div>
-                            ) : (
-                                <div className="flex flex-col gap-3">
-                                    {getFilteredPosts().map(post => (
-                                        <div 
-                                            key={post.id || post.url || post.link}
-                                            onClick={() => setReadingPost(post)}
-                                            className="bg-white hover:bg-gray-50 border border-gray-150 p-4 rounded-2xl transition cursor-pointer flex flex-col gap-2 shadow-[0_2px_4px_rgba(0,0,0,0.02)] active:scale-[0.98] border-b-2 border-b-gray-200"
-                                        >
-                                            <h3 className="text-[15px] font-bold text-gray-950 line-clamp-2 leading-tight tracking-tight font-sans">
-                                                {post.title}
-                                            </h3>
-                                            <div className="flex items-center justify-between text-[11px] text-gray-500 font-bold uppercase tracking-wide">
-                                                <span className="text-[#0f3a5f]">{formatSourceName(post.source_site || "")}</span>
-                                                <span className="font-mono text-[10px] text-gray-400 normal-case">{getRelativeTime(post.published_at)}</span>
-                                            </div>
-                                            <div className="flex items-center justify-between mt-1 pt-3 border-t border-gray-100">
-                                                <span className={"text-[9px] px-3 py-0.5 rounded-full uppercase font-black tracking-widest " + getCategoryTheme(post.categoria).badge}>
-                                                    {post.categoria || "Geral"}
-                                                </span>
-                                                <div className="flex items-center gap-2">
-                                                    {favorites.includes(post.link || post.url || post.id) && (
-                                                       <svg className="w-3.5 h-3.5 fill-yellow-400 text-yellow-400" viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" /></svg>
-                                                    )}
-                                                    <svg className="w-4 h-4 text-gray-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="9 18 15 12 9 6"/></svg>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-                    )}
-
-                    {/* MODO LEITURA (WEBVIEW INTEGRADO) */}
-                    {readingPost && (
-                        <div className="absolute inset-0 bg-white z-[70] flex flex-col animate-fade-in">
-                            <header className="h-16 bg-white border-b border-gray-150 flex items-center justify-between px-3 shrink-0">
-                                <button onClick={() => setReadingPost(null)} className="w-10 h-10 flex items-center justify-center text-gray-600 hover:bg-gray-100 rounded-full transition">
-                                    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
-                                </button>
-                                <div className="text-center truncate max-w-[220px]">
-                                    <span className="text-[10px] text-blue-600 font-black uppercase block tracking-widest mb-0.5">{formatSourceName(readingPost.source_site)}</span>
-                                    <span className="text-[11px] font-bold text-gray-900 block truncate">{readingPost.title}</span>
-                                </div>
-                                <div className="flex items-center gap-1">
-                                    <button onClick={() => toggleFavorite(readingPost.link || readingPost.url || readingPost.id)} className="p-2">
-                                        <svg className={"w-5 h-5 " + (favorites.includes(readingPost.link || readingPost.url || readingPost.id) ? "fill-yellow-400 text-yellow-400" : "text-gray-300")} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" /></svg>
-                                    </button>
-                                    <a href={readingPost.url || readingPost.link} target="_blank" className="w-8 h-8 flex items-center justify-center text-blue-600">
-                                        <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-                                    </a>
-                                </div>
-                            </header>
-                            <div className="flex-1 w-full bg-gray-50 relative">
-                                <iframe src={readingPost.url || readingPost.link} className="w-full h-full border-none bg-white" />
-                                <div className="absolute top-0 left-0 w-full h-1 bg-blue-600/10" />
                             </div>
-                        </div>
-                    )}
+                        ))}
+                    </div>
 
-                    {/* ALERTAS PUSH SIMULADOS */}
-                    {activeScreen === "alerts" && (
-                        <div className="flex-1 overflow-y-auto px-5 py-6 pb-24 bg-[#F8F9FA] text-left animate-fade-in">
-                            <h3 className="text-xs font-black text-gray-800 uppercase tracking-[0.2em] mb-6 flex items-center gap-2.5">
-                                <div className="relative">
-                                    <div className="w-3 h-3 bg-red-500 rounded-full animate-ping absolute opacity-75"></div>
-                                    <div className="w-3 h-3 bg-red-600 rounded-full relative"></div>
-                                </div> 
-                                Alertas Configurados
-                            </h3>
-                            <div className="space-y-3">
-                                {activeAlerts.length === 0 ? (
-                                    <div className="py-16 text-center text-gray-400 flex flex-col items-center gap-3 bg-white rounded-3xl border border-gray-150 p-6">
-                                        <svg className="w-12 h-12 text-gray-100" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-                                        <span className="text-[10px] font-bold uppercase max-w-[140px] leading-relaxed">Você ainda não configurou alertas de notificações.</span>
-                                    </div>
-                                ) : (
-                                    activeAlerts.map(al => {
-                                        const [cat, sub] = al.split(":::");
-                                        const theme = getCategoryTheme(cat);
-                                        return (
-                                            <div key={al} className="bg-white border border-gray-150 p-4 rounded-2xl flex items-center justify-between shadow-sm border-l-4" style={{borderLeftColor: theme.dot.replace('bg-', '')}}>
-                                                <div className="flex flex-col gap-0.5">
-                                                    <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">{cat}</span>
-                                                    <span className="text-sm font-bold text-gray-950">{sub || "Todo o canal"}</span>
-                                                </div>
-                                                <button onClick={() => toggleAlert(cat, sub)} className="h-10 w-10 flex items-center justify-center text-red-500 hover:bg-red-50 rounded-full transition active:scale-90">
-                                                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
-                                                </button>
-                                            </div>
-                                        );
-                                    })
-                                )}
-                            </div>
-                        </div>
-                    )}
-
-                    {/* BARRA DE NAVEGAÇÃO INFERIOR */}
-                    <nav className="absolute bottom-0 inset-x-0 h-20 bg-white/80 backdrop-blur-md border-t border-gray-150 grid grid-cols-2 items-start pt-3 pb-safe-pb z-40 px-6">
-                        <button onClick={() => setActiveScreen("feed")} className="flex flex-col items-center justify-center gap-1 active:scale-90 transition">
-                            <div className={"p-2 rounded-2xl transition " + (activeScreen === "feed" ? "bg-blue-600 text-white shadow-lg shadow-blue-200" : "text-gray-400")}>
-                                <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
-                            </div>
-                            <span className={"text-[9px] font-black uppercase tracking-widest mt-0.5 " + (activeScreen === "feed" ? "text-blue-600" : "text-gray-400")}>Feed</span>
+                    <nav className="absolute bottom-0 inset-x-0 h-16 bg-white border-t border-gray-100 grid grid-cols-2 safe-pb">
+                        <button onClick={() => setActiveScreen("feed")} className={"flex flex-col items-center justify-center " + (activeScreen === "feed" ? "text-blue-600" : "text-gray-300")}>
+                            <div className="w-6 h-6"><Icons.Settings /></div>
+                            <span className="text-[9px] font-black uppercase tracking-widest mt-1">Feed</span>
                         </button>
-                        <button onClick={() => setActiveScreen("alerts")} className="flex flex-col items-center justify-center gap-1 active:scale-90 transition">
-                            <div className={"p-2 rounded-2xl relative transition " + (activeScreen === "alerts" ? "bg-blue-600 text-white shadow-lg shadow-blue-200" : "text-gray-400")}>
-                                <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-                                {activeAlerts.length > 0 && <div className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white animate-pulse"></div>}
+                        <button onClick={() => setActiveScreen("alerts")} className={"flex flex-col items-center justify-center " + (activeScreen === "alerts" ? "text-blue-600" : "text-gray-300")}>
+                            <div className="w-6 h-6 relative">
+                                <Icons.Bell />
+                                {activeAlerts.length > 0 && <div className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-red-500 rounded-full border-white border animate-pulse"></div>}
                             </div>
-                            <span className={"text-[9px] font-black uppercase tracking-widest mt-0.5 " + (activeScreen === "alerts" ? "text-blue-600" : "text-gray-400")}>Alertas</span>
+                            <span className="text-[9px] font-black uppercase tracking-widest mt-1">Alertas</span>
                         </button>
                     </nav>
 
-                    {/* FILTROS DRAWER (MODAL LATERAL) */}
+                    {/* READING MODE */}
+                    {readingPost && (
+                        <div className="absolute inset-x-0 top-0 bottom-0 bg-white z-[60] flex flex-col animate-fade-in">
+                            <header className="h-14 bg-white border-b border-gray-100 flex items-center justify-between px-3 shrink-0 pt-safe">
+                                <button onClick={() => setReadingPost(null)} className="w-10 h-10 flex items-center justify-center text-gray-400">←</button>
+                                <span className="text-xs font-bold text-gray-900 truncate max-w-[200px]">{readingPost.title}</span>
+                                <a href={readingPost.url} target="_blank" className="p-2 text-blue-600"><Icons.ExternalLink /></a>
+                            </header>
+                            <iframe src={readingPost.url} className="flex-1 w-full border-none bg-gray-50" />
+                        </div>
+                    )}
+
+                    {/* FILTER DRAWER */}
                     {isBottomSheetOpen && (
-                        <div className="absolute inset-0 z-[60] flex animate-fade-in">
-                            <div className="w-[15%] h-full bg-black/60 backdrop-blur-sm" onClick={() => setIsBottomSheetOpen(false)} />
-                            <div className="w-[85%] h-full bg-white flex flex-col shadow-2xl border-l border-gray-150 animate-slide-up">
-                                <header className="h-14 bg-gray-50 border-b border-gray-150 flex items-center justify-between px-5 shrink-0 pt-safe-pt">
-                                    <div className="flex flex-col gap-0.5">
-                                        <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Configuração</span>
-                                        <span className="text-base font-black text-gray-900 uppercase">Filtros Ativos</span>
-                                    </div>
-                                    <button onClick={() => setIsBottomSheetOpen(false)} className="h-10 w-10 flex items-center justify-center bg-[#0f3a5f] text-white rounded-full shadow-lg shadow-blue-200 active:scale-90 transition">
-                                        <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="20 6 9 17 4 12"/></svg>
-                                    </button>
+                        <div className="absolute inset-0 z-[70] flex animate-fade-in overflow-hidden">
+                            <div className="w-[20%] h-full bg-black/40" onClick={() => setIsBottomSheetOpen(false)}></div>
+                            <div className="w-[80%] h-full bg-white shadow-2xl animate-slide-left flex flex-col">
+                                <header className="h-12 bg-gray-50 border-b border-gray-100 flex items-center justify-between px-4 shrink-0 pt-safe">
+                                    <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest">FILTROS</span>
+                                    <button onClick={() => setIsBottomSheetOpen(false)} className="text-blue-600 font-bold text-xs uppercase">OK</button>
                                 </header>
-                                <div className="flex-1 overflow-y-auto p-5 pb-32 space-y-6 scrollbar-none">
-                                    {filterTree.length === 0 ? (
-                                        <div className="py-12 text-center text-gray-400 text-xs italic">Carregando categorias...</div>
-                                    ) : (
-                                        filterTree.map(item => {
-                                            const theme = getCategoryTheme(item.categoria);
-                                            return (
-                                                <div key={item.categoria} className="flex flex-col gap-3">
-                                                    <div className="flex items-center justify-between bg-gray-100/50 p-3 rounded-2xl border border-gray-150 transition active:bg-gray-100">
-                                                        <div className="flex items-center gap-3 cursor-pointer flex-1" onClick={() => toggleCategory(item.categoria)}>
-                                                            <div className={"w-6 h-6 rounded-lg border transition-all flex items-center justify-center " + (item.selected ? theme.checkbox + " text-white shadow-md shadow-blue-100" : "bg-white border-gray-300")}>
-                                                                {item.selected && <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4"><polyline points="20 6 9 17 4 12"/></svg>}
-                                                            </div>
-                                                            <span className="text-[11px] font-black text-[#0f3a5f] uppercase tracking-tight leading-none">{item.categoria}</span>
-                                                        </div>
-                                                        <button onClick={() => toggleCollapse(item.categoria)} className="p-2 -mr-2 bg-white/50 rounded-xl">
-                                                            <svg className={"w-4 h-4 text-gray-400 transition-transform " + (item.isOpen ? "rotate-180" : "")} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="6 9 12 15 18 9"/></svg>
-                                                        </button>
+                                <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                                    {filterTree.map(item => {
+                                        const theme = getCategoryTheme(item.categoria);
+                                        return (
+                                            <div key={item.categoria} className="space-y-1">
+                                                <div className="bg-gray-50 p-2 rounded-xl flex items-center justify-between border border-gray-100">
+                                                    <div className="flex items-center gap-2">
+                                                        <div className={"w-5 h-5 rounded border transition " + theme.checkbox}></div>
+                                                        <span className="text-[11px] font-black text-gray-900 uppercase">{item.categoria}</span>
                                                     </div>
-                                                    {item.isOpen && (
-                                                        <div className="grid grid-cols-1 gap-1 pl-1 animate-fade-in">
-                                                            {item.subcategorias.map(sub => {
-                                                                const alertKey = item.categoria.trim() + ":::" + sub.trim();
-                                                                const isAlerted = activeAlerts.includes(alertKey);
-                                                                const isActive = item.activeSubs.includes(sub);
-                                                                return (
-                                                                    <div key={sub} className="flex items-center justify-between py-2 border-b border-gray-50 last:border-none animate-slide-up" style={{animationDelay: '0.05s'}}>
-                                                                        <div className="flex items-center gap-3 cursor-pointer flex-1" onClick={() => toggleSubcategory(item.categoria, sub)}>
-                                                                            <div className={"w-5 h-5 rounded-md border transition-all flex items-center justify-center " + (isActive ? theme.checkbox + " text-white" : "bg-white border-gray-200")}>
-                                                                                {isActive && <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4"><polyline points="20 6 9 17 4 12"/></svg>}
-                                                                            </div>
-                                                                            <span className="text-xs font-bold text-gray-700">{sub}</span>
-                                                                        </div>
-                                                                        <button onClick={(e) => toggleAlert(item.categoria, sub, e)} className={"h-9 w-9 flex items-center justify-center rounded-xl transition " + (isAlerted ? "bg-yellow-50 text-yellow-500" : "text-gray-300 bg-gray-50/50")}>
-                                                                            <svg className={"w-4 h-4 " + (isAlerted ? "fill-yellow-500" : "")} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-                                                                        </button>
-                                                                    </div>
-                                                                );
-                                                            })}
-                                                        </div>
-                                                    )}
                                                 </div>
-                                            );
-                                        })
-                                    )}
+                                                <div className="pl-4 space-y-2 py-2">
+                                                    {item.subcategorias.map(sub => (
+                                                        <div key={sub} className="flex items-center justify-between py-1 border-b border-gray-50 last:border-none">
+                                                            <span className="text-xs font-bold text-gray-600">{sub}</span>
+                                                            <button onClick={(e) => toggleAlert(item.categoria, sub, e)} className={"p-2 rounded-full " + (activeAlerts.includes(item.categoria + ":::" + sub) ? "text-red-500 bg-red-50" : "text-gray-300")}>
+                                                                <div className="w-3.5 h-3.5"><Icons.Bell /></div>
+                                                            </button>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
                                 </div>
-                                <footer className="absolute bottom-0 inset-x-0 p-6 bg-white border-t border-gray-150 flex flex-col gap-3">
-                                   <button 
-                                      onClick={() => setIsBottomSheetOpen(false)}
-                                      className="w-full h-14 bg-[#0f3a5f] text-white font-black uppercase tracking-widest rounded-2xl shadow-xl shadow-blue-100 flex items-center justify-center gap-2 active:scale-95 transition"
-                                   >
-                                      Sincronizar Feed
-                                   </button>
-                                </footer>
                             </div>
                         </div>
                     )}
