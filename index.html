@@ -1,25 +1,27 @@
 <!DOCTYPE html>
-<html lang="pt-BR" class="dark">
+<html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Point das Milhas PWA</title>
+    <!-- Bibliotecas Necessárias via CDN -->
     <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- @supabase/supabase-js cliente oficial -->
     <script src="https://unpkg.com/@supabase/supabase-js@2.39.8/dist/umd/supabase.js"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
     
     <script>
         tailwind.config = {
-            darkMode: 'class',
             theme: {
                 extend: {
                     colors: {
-                        slate: {
-                            950: '#020617',
-                            900: '#0f172a',
-                            850: '#1e293b'
+                        brand: {
+                            dark: '#0f3a5f',
+                            medium: '#1d4ed8'
                         }
                     }
                 }
@@ -33,47 +35,31 @@
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             margin: 0;
             padding: 0;
-            background-color: #020617;
+            background-color: #F1F3F4;
             overflow: hidden;
-            height: 100vh;
-            width: 100vw;
         }
         /* Ocultar barra de rolagem estética */
         ::-webkit-scrollbar {
             width: 4px;
         }
         ::-webkit-scrollbar-track {
-            background: #020617;
+            background: #F1F3F4;
         }
         ::-webkit-scrollbar-thumb {
-            background: #1e293b;
+            background: #cbd5e1;
             border-radius: 99px;
-        }
-        
-        /* Ajuste para o iframe ocupar todo o espaço */
-        .iframe-container iframe {
-            width: 100%;
-            height: 100%;
-            border: none;
         }
     </style>
 </head>
-<body class="bg-slate-950 text-slate-100 antialiased select-none">
+<body class="bg-[#F1F3F4] text-gray-900 antialiased select-none">
     <div id="root"></div>
 
     <script type="text/babel">
         const { useState, useEffect, useRef } = React;
 
-        // IMPORTANTE: Suas credenciais já estão configuradas
+        // IMPORTANTE: COLOQUE AQUI SUAS CREDENCIAIS DO SUPABASE PARA LER A TABELA 'news'
         const SUPABASE_URL = "https://pifarsxbrfwvmvlwvtnk.supabase.co";
         const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBpZmFyc3hicmZ3dm12bHd2dG5rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk2NDg0OTYsImV4cCI6MjA5NTIyNDQ5Nn0.xrgI7q8z0Yew70kxZzWz4v8IiF_eHSY97Ed2NxvTwWw";
-
-        // Ícones Simples em SVG para não depender de biblioteca externa travando
-        const IconClock = () => <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>;
-        const IconChevronRight = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>;
-        const IconChevronDown = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"/></svg>;
-        const IconBack = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>;
-        const IconAlert = () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>;
 
         function App() {
             const [posts, setPosts] = useState([]);
@@ -84,46 +70,32 @@
             const [lastRefreshTime, setLastRefreshTime] = useState(new Date().toLocaleTimeString());
             const [secondsToRefresh, setSecondsToRefresh] = useState(1200);
 
-            // Estrutura de filtros baseada na árvore de decisão da sua planilha
+            // Filtros com checkbox 100% circular
             const [filterTree, setFilterTree] = useState([
                 {
-                    categoria: "Acúmulo",
-                    subcategorias: ["Cartão de Crédito", "Compra de Pontos", "Shopping", "Clube", "Outros"],
+                    categoria: "Cartões de Crédito",
+                    subcategorias: ["Acúmulo", "Benefícios", "Isenção de Anuidade", "Adesão"],
                     isOpen: true,
                     selected: true,
-                    activeSubs: ["Cartão de Crédito", "Compra de Pontos", "Shopping", "Clube", "Outros"]
+                    activeSubs: ["Acúmulo", "Benefícios", "Isenção de Anuidade", "Adesão"]
                 },
                 {
-                    categoria: "Transferência Bonificada",
-                    subcategorias: ["Azul", "Smiles", "LATAM Pass", "TAP", "Livelo", "Esfera", "Iuppi", "C6/Átomos", "Mercado Pago", "Outros"],
+                    categoria: "Fidelidade Nacional",
+                    subcategorias: ["Transferência Bonificada", "Compra de Pontos", "Resgate de Voos"],
                     isOpen: true,
                     selected: true,
-                    activeSubs: ["Azul", "Smiles", "LATAM Pass", "TAP", "Livelo", "Esfera", "Iuppi", "C6/Átomos", "Mercado Pago", "Outros"]
+                    activeSubs: ["Transferência Bonificada", "Compra de Pontos", "Resgate de Voos"]
                 },
                 {
-                    categoria: "Emissões",
-                    subcategorias: ["Nacional", "Internacional", "Tabela Fixa"],
-                    isOpen: false,
-                    selected: false,
-                    activeSubs: []
-                },
-                {
-                    categoria: "Cartões",
-                    subcategorias: ["Anuidade", "Adesão/Bônus", "Benefícios", "Spread"],
-                    isOpen: false,
-                    selected: false,
-                    activeSubs: []
-                },
-                {
-                    categoria: "Hospedagem",
-                    subcategorias: ["Promoção", "Status Match"],
+                    categoria: "Fidelidade Internacional",
+                    subcategorias: ["Bônus de Envio", "Alianças Aéreas", "Tabela Fixa"],
                     isOpen: false,
                     selected: false,
                     activeSubs: []
                 }
             ]);
 
-            const [activeAlerts, setActiveAlerts] = useState(["Transferência Bonificada", "Azul", "Smiles"]);
+            const [activeAlerts, setActiveAlerts] = useState(["Transferência Bonificada"]);
 
             useEffect(() => {
                 fetchNewsFromSupabase();
@@ -139,53 +111,111 @@
                 return () => clearInterval(interval);
             }, []);
 
+            useEffect(() => {
+                if (posts.length === 0) return;
+                const found = {};
+                posts.forEach(p => {
+                    const cat = p.categoria;
+                    const sub = p.subcategoria;
+                    if (!cat || !sub) return;
+                    const c = cat.trim();
+                    const s = sub.trim();
+                    if (c.toLowerCase() === "ignorado" || s.toLowerCase() === "ignorado") return;
+                    if (!found[c]) found[c] = [];
+                    if (!found[c].includes(s)) found[c].push(s);
+                });
+
+                setFilterTree(prev => {
+                    let isChanged = false;
+                    const nextTree = prev.map(item => {
+                        const existingCat = Object.keys(found).find(c => c.toLowerCase() === item.categoria.toLowerCase());
+                        if (existingCat) {
+                            const newSubs = [...item.subcategorias];
+                            const newActive = [...item.activeSubs];
+                            found[existingCat].forEach(sub => {
+                                if (!item.subcategorias.some(s => s.toLowerCase() === sub.toLowerCase())) {
+                                    newSubs.push(sub);
+                                    newActive.push(sub);
+                                    isChanged = true;
+                                }
+                            });
+                            return { ...item, subcategorias: newSubs, activeSubs: newActive, selected: newActive.length === newSubs.length };
+                        }
+                        return item;
+                    });
+
+                    Object.keys(found).forEach(cat => {
+                        const hasCat = prev.some(item => item.categoria.toLowerCase() === cat.toLowerCase());
+                        if (!hasCat) {
+                            nextTree.push({
+                                categoria: cat,
+                                subcategorias: found[cat],
+                                isOpen: true,
+                                selected: true,
+                                activeSubs: [...found[cat]]
+                            });
+                            isChanged = true;
+                        }
+                    });
+
+                    return isChanged ? nextTree : prev;
+                });
+            }, [posts]);
+
             // Método Real Supabase API
             const fetchNewsFromSupabase = async () => {
                 setIsLoading(true);
                 try {
-                    if (SUPABASE_URL && SUPABASE_ANON_KEY) {
+                    if (SUPABASE_URL && !SUPABASE_URL.includes("SUA_URL")) {
                         const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
                         const { data, error } = await sb
                             .from("news")
                             .select("*")
-                            .order("published_at", { ascending: false })
-                            .limit(50); // Limitando para performance no protótipo
+                            .order("published_at", { ascending: false });
                         
                         if (error) throw error;
                         if (data) {
-                            // Filtra notícias "fora do tema" direto na origem
-                            const validData = data.filter(p => 
-                                p.categoria && 
-                                p.subcategoria && 
-                                p.categoria.toLowerCase() !== "ignorado" && 
-                                p.subcategoria.toLowerCase() !== "ignorado"
-                            );
-                            setPosts(validData);
+                            setPosts(data);
                             setLastRefreshTime(new Date().toLocaleTimeString());
                         }
+                    } else {
+                        // Dados de Fallback sofisticados de portais de milhas reais
+                        const mockData = [
+                            {
+                                id: 1,
+                                title: "Livelo lança compre pontos com até 55% de desconto para assinantes",
+                                url: "https://pontospravoar.com/compre-pontos",
+                                published_at: new Date(Date.now() - 1000*60*15).toISOString(),
+                                summary: "Oportunidade para gerar lotes de 1.000 pontos Livelo a valores competitivos.",
+                                categoria: "Fidelidade Nacional",
+                                subcategoria: "Compra de Pontos",
+                                source_site: "pontospravoar.com"
+                            },
+                            {
+                                id: 2,
+                                title: "Dux Visa Infinite do BRB estende acesso a salas VIP gratuitas",
+                                url: "https://passageirodeprimeira.com",
+                                published_at: new Date(Date.now() - 1000*60*45).toISOString(),
+                                summary: "Cartão de metal mais exclusivo do país mantém benefícios premium inalterados.",
+                                categoria: "Cartões de Crédito",
+                                subcategoria: "Benefícios",
+                                source_site: "passageirodeprimeira.com"
+                            }
+                        ];
+                        setPosts(mockData);
                     }
                 } catch(e) {
-                    console.error("Falha ao recuperar notícias do Supabase", e);
+                    console.error("Falha ao recuperar notícias", e);
                 } finally {
                     setIsLoading(false);
                 }
             };
 
-            const toggleCategoryExpand = (catName) => {
-                setFilterTree(prev => prev.map(item => 
-                    item.categoria === catName ? { ...item, isOpen: !item.isOpen } : item
-                ));
-            };
-
-            const toggleCategorySelection = (catName) => {
+            const toggleCategory = (catName) => {
                 setFilterTree(prev => prev.map(item => {
                     if (item.categoria === catName) {
-                        const nextSelected = !item.selected;
-                        return { 
-                            ...item, 
-                            selected: nextSelected, 
-                            activeSubs: nextSelected ? [...item.subcategorias] : [] 
-                        };
+                        const next = !item.selected;
+                        return { ...item, selected: next, activeSubs: next ? [...item.subcategorias] : [] };
                     }
                     return item;
                 }));
@@ -194,15 +224,9 @@
             const toggleSubcategory = (catName, subName) => {
                 setFilterTree(prev => prev.map(item => {
                     if (item.categoria === catName) {
-                        const isActive = item.activeSubs.includes(subName);
-                        const nextSubs = isActive 
-                            ? item.activeSubs.filter(s => s !== subName) 
-                            : [...item.activeSubs, subName];
-                        return { 
-                            ...item, 
-                            activeSubs: nextSubs, 
-                            selected: nextSubs.length === item.subcategorias.length 
-                        };
+                        const active = item.activeSubs.includes(subName);
+                        const nextSubs = active ? item.activeSubs.filter(s => s !== subName) : [...item.activeSubs, subName];
+                        return { ...item, activeSubs: nextSubs, selected: nextSubs.length === item.subcategorias.length };
                     }
                     return item;
                 }));
@@ -215,226 +239,282 @@
             const getFilteredPosts = () => {
                 const activeSubs = filterTree.flatMap(item => item.activeSubs);
                 return posts.filter(p => {
-                    if (!p.subcategoria) return false;
-                    return activeSubs.includes(p.subcategoria);
+                    const cat = (p.categoria || "").trim().toLowerCase();
+                    const sub = (p.subcategoria || "").trim().toLowerCase();
+                    if (cat === "ignorado" || sub === "ignorado") return false;
+                    return !p.subcategoria || activeSubs.includes(p.subcategoria);
                 });
             };
 
-            // Função para formatar tempo relativo simples
-            const formatRelativeTime = (dateString) => {
-                if (!dateString) return "n/d";
-                const now = new Date();
-                const past = new Date(dateString);
-                const diffInMs = now - past;
-                const diffInMin = Math.floor(diffInMs / (1000 * 60));
-                const diffInHours = Math.floor(diffInMin / 60);
-                const diffInDays = Math.floor(diffInHours / 24);
-
-                if (diffInMin < 1) return "agora";
-                if (diffInMin < 60) return `há ${diffInMin} min`;
-                if (diffInHours < 24) return `há ${diffInHours}h`;
-                return `há ${diffInDays} dias`;
+            const getCategoryBadgeStyle = (cat) => {
+                const c = (cat || "").toLowerCase();
+                if (c.includes("cart") || c.includes("crédito")) {
+                    return "bg-amber-50 text-amber-700 border border-amber-200";
+                }
+                if (c.includes("nacional")) {
+                    return "bg-blue-50 text-blue-700 border border-blue-200";
+                }
+                return "bg-purple-50 text-purple-700 border border-purple-200";
             };
 
             return (
-                <div className="flex flex-col h-screen max-w-md mx-auto bg-slate-950 border-x border-slate-900 relative overflow-hidden">
+                <div className="flex flex-col h-screen max-w-sm mx-auto bg-[#F1F3F4] border-x border-gray-200 relative shadow-2xl">
                     
-                    {/* CABEÇALHO FIXO NATIVO */}
-                    <header className="sticky top-0 bg-slate-900/95 backdrop-blur-sm border-b border-slate-800 h-14 flex items-center justify-between px-4 z-40">
+                    {/* CABEÇALHO CLEAN WHITE COM TEXTO GRADIENTE */}
+                    <header className="sticky top-0 bg-white border-b border-gray-150 h-14 flex items-center justify-between px-4 z-40 shadow-sm">
                         <div className="flex items-center gap-2">
-                            <span className="w-2.5 h-2.5 rounded-full bg-blue-500 animate-pulse"></span>
-                            <span className="font-bold tracking-tight text-sm text-white font-mono">POINT DAS MILHAS</span>
+                            <span className="font-extrabold tracking-tight text-xs font-sans uppercase bg-gradient-to-r from-[#0f3a5f] to-[#1d4ed8] bg-clip-text text-transparent">POINT DAS MILHAS</span>
                         </div>
                         
-                        <div className="flex items-center gap-1.5 text-slate-500 font-mono text-[10px]">
-                            <IconClock />
-                            <span>refresh em {Math.floor(secondsToRefresh / 60)}m</span>
+                        <div className="flex items-center gap-1.5">
+                            <button 
+                                onClick={fetchNewsFromSupabase}
+                                className="flex items-center gap-1 bg-[#0f3a5f]/10 hover:bg-[#0f3a5f]/20 text-[#0f3a5f] px-2.5 py-0.5 rounded-full text-[9px] font-bold transition border border-[#0f3a5f]/20 shadow-sm active:scale-95 cursor-pointer"
+                            >
+                                <i data-lucide="refresh-cw" className={"w-2.5 h-2.5 text-[#0f3a5f] " + (isLoading ? "animate-spin" : "")}></i>
+                                <span>Atualizar</span>
+                            </button>
                         </div>
                     </header>
 
                     {/* MIOLO COM SCROLL INDEPENDENTE */}
-                    <main className="flex-1 overflow-y-auto px-3 py-3 pb-24">
-                        
-                        {/* INDICADOR DE STATUS */}
-                        <div className="flex items-center justify-between px-1 mb-3 text-[10px] text-slate-600 font-mono">
-                            <span>Sincronizado: {lastRefreshTime}</span>
-                            <button onClick={fetchNewsFromSupabase} className="hover:text-blue-500 font-bold flex items-center gap-1">
-                                <span className="underline">forçar atualização</span>
-                            </button>
-                        </div>
-
-                        {isLoading && posts.length === 0 && (
-                            <div className="py-20 flex flex-col items-center justify-center text-slate-600 text-xs gap-3">
-                                <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-                                Consultando Supabase...
+                    <div className="flex-1 overflow-y-auto px-3 py-3 pb-24">
+                        {isLoading && (
+                            <div className="py-12 flex flex-col items-center justify-center text-gray-500 text-xs">
+                                <span className="animate-spin text-blue-500 text-lg mb-2">●</span>
+                                Carregando últimas novidades...
                             </div>
                         )}
 
                         {!isLoading && getFilteredPosts().length === 0 ? (
-                            <div className="py-16 text-center text-slate-600 text-xs px-8 border border-dashed border-slate-800 rounded-2xl bg-slate-900/20">
-                                <div className="text-xl mb-2">🔭</div>
-                                Nenhuma notícia encontrada para os filtros selecionados.<br/>Tente ativar mais categorias na aba Filtros.
+                            <div className="py-20 text-center text-gray-500 text-xs px-6 border border-dashed border-gray-300 bg-white rounded-2xl shadow-sm">
+                                Nenhuma notícia atende aos filtros atuais. Modifique suas seleções na aba de Filtros abaixo!
                             </div>
                         ) : (
-                            <div className="flex flex-col gap-2">
-                                {getFilteredPosts().map(post => (
-                                    <article 
-                                        key={post.id}
-                                        onClick={() => setReadingPost(post)}
-                                        className="bg-slate-900/60 hover:bg-slate-900 border border-slate-800/50 hover:border-slate-700 p-3 rounded-xl transition cursor-pointer flex flex-col gap-1.5 active:scale-[0.98]"
-                                    >
-                                        <div className="flex items-center justify-between text-[10px] text-slate-500 font-mono">
-                                            <span className="bg-slate-800 text-slate-300 font-semibold px-2 py-0.5 rounded">
-                                                {post.source_site ? post.source_site.replace("www.","").split('/')[0] : "portal"}
-                                            </span>
-                                            <span>{formatRelativeTime(post.published_at)}</span>
+                            <div className="flex flex-col gap-1.5">
+                                {getFilteredPosts().map(post => {
+                                    return (
+                                        <div 
+                                            key={post.id || post.url || post.link}
+                                            onClick={() => setReadingPost(post)}
+                                            className="bg-white hover:bg-gray-50 border border-gray-200/80 p-2.5 text-left rounded-xl transition cursor-pointer flex flex-col gap-1 shadow-sm active:bg-gray-100"
+                                        >
+                                            <h3 className="text-[11px] font-bold text-gray-900 line-clamp-2 leading-snug tracking-tight">
+                                                {post.title}
+                                            </h3>
+                                            
+                                            <div className="flex items-center justify-between text-[10px] text-gray-500 font-medium">
+                                                <span>{post.source_site ? post.source_site.replace("www.","") : (post.sourceName || "portal")}</span>
+                                                <span className="font-mono text-[9px]">recent</span>
+                                            </div>
+
+                                            <div className="flex items-center justify-between mt-1 pt-1 border-t border-gray-100">
+                                                <span className={"font-mono text-[8px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wide shrink-0 " + getCategoryBadgeStyle(post.categoria)}>
+                                                    {post.subcategoria || "Milhas Geral"}
+                                                </span>
+                                                <i data-lucide="chevron-right" className="w-3.5 h-3.5 text-gray-400"></i>
+                                            </div>
                                         </div>
-                                        <h3 className="text-[12px] font-semibold text-slate-100 line-clamp-2 leading-snug">{post.title}</h3>
-                                        <div className="flex items-center justify-between mt-0.5">
-                                            <span className="bg-blue-950/50 text-blue-400 border border-blue-900/50 font-mono text-[9px] px-2 py-0.5 rounded font-medium">
-                                                {post.subcategoria}
-                                            </span>
-                                            <div className="text-slate-600"><IconChevronRight /></div>
-                                        </div>
-                                    </article>
-                                ))}
+                                    );
+                                })}
                             </div>
                         )}
-                    </main>
+                    </div>
 
-                    {/* CONTROLES DE LEITURA CHEIA (IFRAME) */}
+                    {/* CONTROLES DE LEITURA CHEIA */}
                     {readingPost && (
-                        <div className="absolute inset-0 bg-slate-950 z-50 flex flex-col animate-slideInUp">
-                            <div className="sticky top-0 h-14 bg-slate-900 border-b border-slate-800 flex items-center justify-between px-2 z-10">
+                        <div className="absolute inset-x-0 top-0 bottom-0 bg-white z-50 rounded-b-[34px] p-1 flex flex-col">
+                            <div className="h-14 bg-white border-b border-gray-150 flex items-center justify-between px-2 shrink-0">
                                 <button 
                                     onClick={() => setReadingPost(null)}
-                                    className="w-10 h-10 flex items-center justify-center text-slate-300 hover:text-white active:bg-slate-800 rounded-full"
+                                    style={{ width: '45px', height: '45px' }}
+                                    className="flex items-center justify-center text-gray-600 hover:text-gray-900"
                                 >
-                                    <IconBack />
+                                    <span className="text-lg font-bold">←</span>
                                 </button>
-                                <span className="text-[11px] text-slate-400 font-medium max-w-[200px] truncate text-center">{readingPost.title}</span>
+                                <span className="text-[10px] font-bold text-gray-900 max-w-[150px] truncate">{readingPost.title}</span>
                                 <a 
-                                    href={readingPost.url} 
+                                    href={readingPost.url || readingPost.link} 
                                     target="_blank" 
-                                    rel="noopener noreferrer"
-                                    className="text-blue-500 font-mono text-[10px] px-3 py-1.5 hover:bg-blue-950 rounded-lg active:scale-95"
+                                    className="text-[10px] text-blue-600 bg-blue-50 hover:bg-blue-100 px-2.5 py-1.5 rounded font-bold transition flex items-center gap-1 active:scale-95"
                                 >
-                                    Sair
+                                    Abrir Link
                                 </a>
                             </div>
-                            <div className="flex-1 bg-white iframe-container overflow-hidden relative">
-                                {/* Indicador de carregamento atrás do iframe */}
-                                <div className="absolute inset-0 flex items-center justify-center text-slate-400 text-xs bg-slate-950">Carregando site...</div>
+                            <div className="flex-1 bg-white rounded-b-2xl overflow-hidden relative flex flex-col">
                                 <iframe 
-                                    src={readingPost.url} 
-                                    title="Leitura da Notícia"
-                                    className="relative z-10 w-full h-full"
+                                    src={readingPost.url || readingPost.link} 
+                                    className="flex-1 w-full border-none h-full bg-gray-50"
+                                    title="Modo Leitura"
+                                    sandbox="allow-scripts allow-same-origin allow-popups"
                                 />
                             </div>
                         </div>
                     )}
 
-                    {/* BARRA DE NAVEGAÇÃO INFERIOR FIXA (BOTTOM NAV) */}
-                    <nav className="fixed bottom-0 left-0 right-0 max-w-md mx-auto h-16 bg-slate-900/95 backdrop-blur-sm border-t border-slate-800 flex items-center justify-around px-4 z-40">
+                    {/* BARRA DE NAVEGAÇÃO INFERIOR FIXA (BOTTOM NAV) - COR BRANCA COM TEXTO EM AZUL GRADIENTE */}
+                    <nav className="absolute bottom-0 inset-x-0 h-14 bg-white border-t border-gray-150 flex items-center justify-around z-40 px-2 shrink-0 shadow-md text-[#0f3a5f]">
                         <button 
                             onClick={() => { setActiveScreen("feed"); setIsBottomSheetOpen(false); }}
-                            className={`flex flex-col items-center justify-center gap-1 w-20 h-12 rounded-lg ${activeScreen === "feed" && !isBottomSheetOpen ? "text-blue-500 bg-blue-950/30" : "text-slate-500 hover:text-slate-300"}`}
+                            style={{ width: '56px', height: '44px' }}
+                            className={"flex flex-col items-center justify-center gap-0.5 transition " + (activeScreen === "feed" ? "scale-105" : "hover:text-[#0f3a5f]/80")}
                         >
-                            <span className="text-[16px]">📰</span>
-                            <span className="text-[10px] font-bold">Feed</span>
+                            <i data-lucide="book-open" className={"w-4 h-4 " + (activeScreen === "feed" ? "text-[#0f3a5f]" : "text-[#0f3a5f]/50")}></i>
+                            <span className={"text-[9px] font-extrabold " + (activeScreen === "feed" ? "bg-gradient-to-r from-[#0f3a5f] to-[#1d4ed8] bg-clip-text text-transparent" : "text-[#0f3a5f]/50")}>Notícias</span>
                         </button>
                         
                         <button 
                             onClick={() => setIsBottomSheetOpen(true)}
-                            className={`flex flex-col items-center justify-center gap-1 w-20 h-12 rounded-lg ${isBottomSheetOpen ? "text-blue-500 bg-blue-950/30" : "text-slate-500 hover:text-slate-300"}`}
+                            style={{ width: '64px', height: '44px' }}
+                            className="flex flex-col items-center justify-center gap-0.5"
                         >
-                            <span className="text-[16px]">⚙️</span>
-                            <span className="text-[10px] font-bold">Filtros</span>
+                            <div className="w-7 h-7 rounded-full flex items-center justify-center bg-[#0f3a5f]/10 border border-[#0f3a5f]/20 shadow-sm relative -top-0.5 animate-fade-in">
+                                <i data-lucide="filter" className="w-3.5 h-3.5 text-[#0f3a5f]"></i>
+                            </div>
+                            <span className="text-[9px] font-extrabold text-[#0f3a5f]/50 -mt-0.5">Filtros</span>
+                        </button>
+
+                        <button 
+                            onClick={() => { setActiveScreen("alerts"); setIsBottomSheetOpen(false); }}
+                            style={{ width: '56px', height: '44px' }}
+                            className={"flex flex-col items-center justify-center gap-0.5 transition " + (activeScreen === "alerts" ? "scale-105" : "hover:text-[#0f3a5f]/80")}
+                        >
+                            <div className="relative">
+                                <i data-lucide="bell" className={"w-4 h-4 " + (activeScreen === "alerts" ? "text-[#0f3a5f]" : "text-[#0f3a5f]/50")}></i>
+                                {activeAlerts.length > 0 && (
+                                    <span className="absolute -top-1.5 -right-1.5 w-2.5 h-2.5 bg-red-500 text-white font-black text-[7px] flex items-center justify-center rounded-full border border-white animate-fade-in">
+                                        {activeAlerts.length}
+                                    </span>
+                                )}
+                            </div>
+                            <span className={"text-[9px] font-extrabold " + (activeScreen === "alerts" ? "bg-gradient-to-r from-[#0f3a5f] to-[#1d4ed8] bg-clip-text text-transparent" : "text-[#0f3a5f]/50")}>Alertas</span>
                         </button>
                     </nav>
 
-                    {/* BOTTOM SHEET DE FILTROS FLUIDO */}
-                    {isBottomSheetOpen && (
-                        <>
-                            {/* Overlay de fundo */}
-                            <div className="absolute inset-0 bg-black/60 z-40 animate-fadeIn" onClick={() => setIsBottomSheetOpen(false)}></div>
-                            
-                            {/* Painel do Sheet */}
-                            <div className="absolute inset-x-0 bottom-0 top-20 bg-slate-900 border-t border-slate-800 rounded-t-2xl z-50 flex flex-col shadow-2xl animate-slideInUp overflow-hidden">
-                                <div className="h-12 flex items-center justify-between px-4 border-b border-slate-800 sticky top-0 bg-slate-900 z-10">
-                                    <span className="text-xs font-bold font-mono text-slate-400">FILTROS & ALERTAS</span>
-                                    <button 
-                                        onClick={() => setIsBottomSheetOpen(false)}
-                                        className="text-[11px] font-bold text-white px-4 py-1.5 bg-blue-600 rounded-lg active:scale-95 transition"
-                                    >
-                                        Aplicar
-                                    </button>
-                                </div>
+                    {/* ALERTA SISTÊMICO PUSH */}
+                    {activeScreen === "alerts" && (
+                        <div className="flex-1 overflow-y-auto px-2 py-3 pb-16 text-left bg-[#F1F3F4]">
+                            <h3 className="text-xs font-bold text-gray-800 uppercase tracking-wide mb-2 border-b border-gray-200 pb-1.5 flex items-center gap-1.5">
+                                <i data-lucide="bell" className="w-3.5 h-3.5 text-blue-600 animate-pulse"></i> Alertas Ativos
+                            </h3>
 
-                                <div className="flex-1 overflow-y-auto p-3 flex flex-col gap-3 pb-10">
-                                    {filterTree.map(item => (
-                                        // CORREÇÃO AQUI: Usando React Fragment para agrupar elementos irmãos
-                                        <React.Fragment key={item.categoria}>
-                                            {/* Linha da Categoria Mãe */}
-                                            <div className="flex items-center gap-2 bg-slate-850 p-2 rounded-xl border border-slate-800">
-                                                {/* Checkbox circular Categoria (Área de toque 44x44) */}
-                                                <button 
-                                                    onClick={() => toggleCategorySelection(item.categoria)}
-                                                    className={`w-10 h-10 flex items-center justify-center flex-shrink-0 rounded-full border-2 transition active:scale-90 ${item.selected ? "bg-blue-500 text-white border-blue-600" : "bg-slate-900 border-slate-700 text-transparent"}`}
+                            <p className="text-[10px] text-gray-650 mb-3 leading-relaxed font-sans">
+                                Você receberá alertas push virtuais no celular sempre que surgir uma nova notícia nos canais marcados em azul.
+                            </p>
+
+                            <div className="space-y-1.5 flex flex-col">
+                                {activeAlerts.length === 0 ? (
+                                    <em className="text-xs text-gray-400 block py-6 text-center bg-white rounded-xl border border-gray-200">Nenhum alerta ativo.</em>
+                                ) : (
+                                    activeAlerts.map((al) => {
+                                        return (
+                                            <div key={al} className="bg-white border border-gray-205 p-2.5 rounded-xl flex items-center justify-between shadow-sm">
+                                                <div className="flex flex-col gap-0.5 text-left">
+                                                    <span className="text-xs font-bold text-gray-800">{al}</span>
+                                                    <span className="text-[9px] font-mono text-gray-400">Notificará imediatamente</span>
+                                                </div>
+                                                <button
+                                                    onClick={() => toggleAlert(al)}
+                                                    className="text-[10px] text-red-500 hover:text-red-700 font-bold hover:underline cursor-pointer"
                                                 >
-                                                    <span className="text-sm font-bold">✓</span>
-                                                </button>
-                                                
-                                                {/* Nome e Botão de Expandir */}
-                                                <button 
-                                                    onClick={() => toggleCategoryExpand(item.categoria)}
-                                                    className="flex-1 flex items-center justify-between p-1 h-10 text-left"
-                                                >
-                                                    <span className="text-[12px] font-bold text-white">{item.categoria}</span>
-                                                    <div className={`transition-transform duration-200 ${item.isOpen ? "rotate-180 text-blue-400" : "rotate-0 text-slate-500"}`}>
-                                                        <IconChevronDown />
-                                                    </div>
+                                                    Desativar
                                                 </button>
                                             </div>
-
-                                            {/* Lista de Subcategorias (Recolhível) */}
-                                            {item.isOpen && (
-                                                <div className="pl-4 pr-1 flex flex-col gap-1 animate-fadeIn overflow-hidden">
-                                                    {item.subcategorias.map(sub => {
-                                                        const isActive = item.activeSubs.includes(sub);
-                                                        const isAlerted = activeAlerts.includes(sub);
-                                                        return (
-                                                            <div key={sub} className="flex items-center justify-between py-1 px-1 border-b border-slate-800/50 last:border-b-0 h-12 gap-2 hover:bg-slate-850/40 rounded-lg">
-                                                                <div className="flex items-center gap-2.5 flex-1 transition" onClick={() => toggleSubcategory(item.categoria, sub)}>
-                                                                    {/* Checkbox circular sub (Área de toque 44x44 similhante) */}
-                                                                    <div 
-                                                                        className={`w-9 h-9 flex items-center justify-center flex-shrink-0 rounded-full border-2 transition active:scale-90 cursor-pointer ${isActive ? "bg-blue-600 text-white border-blue-500" : "bg-slate-950 border-slate-800 text-transparent"}`}
-                                                                    >
-                                                                        <span className="text-xs font-bold">✓</span>
-                                                                    </div>
-                                                                    <span className={`text-[11px] font-medium transition ${isActive ? "text-slate-100" : "text-slate-500"}`}>{sub}</span>
-                                                                </div>
-
-                                                                {/* Sino de Alerta (Área de toque 44x44) */}
-                                                                <button 
-                                                                    onClick={() => toggleAlert(sub)}
-                                                                    className={`w-10 h-10 flex items-center justify-center rounded-lg transition active:scale-90 ${isAlerted ? "text-amber-400 bg-amber-950/40 border border-amber-900" : "text-slate-600 hover:text-slate-400 bg-slate-950 border border-slate-800"}`}
-                                                                >
-                                                                    <IconAlert />
-                                                                </button>
-                                                            </div>
-                                                        );
-                                                    })}
-                                                </div>
-                                            )}
-                                            
-                                            {/* Divisor simples */}
-                                            <div className="h-px bg-slate-800/50 my-1"></div>
-                                        </React.Fragment>
-                                    ))}
-                                </div>
+                                        );
+                                    })
+                                )}
                             </div>
-                        </>
+                        </div>
+                    )}
+
+                    {/* BOTTOM SHEET DE FILTROS COM CHECKBOXES CIRCULARES */}
+                    {isBottomSheetOpen && (
+                        <div className="absolute inset-x-0 bottom-0 top-1/4 bg-white border-t border-gray-205 rounded-t-3xl z-50 flex flex-col shadow-2xl overflow-hidden font-sans text-[#202124]">
+                            {/* Header da bottom sheet */}
+                            <div className="h-12 bg-gray-50 border-b border-gray-200 flex items-center justify-between px-4 shrink-0">
+                                <div className="flex items-center gap-1.5">
+                                    <span className="w-2 h-2 rounded-full bg-blue-600"></span>
+                                    <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wide">FILTROS DAS MILHAS</span>
+                                </div>
+                                <button 
+                                    onClick={() => setIsBottomSheetOpen(false)}
+                                    className="text-[10px] text-white bg-[#1a73e8] hover:bg-blue-700 px-3 py-1 rounded-md transition font-bold cursor-pointer"
+                                >
+                                    Aplicar
+                                </button>
+                            </div>
+
+                            {/* Conteúdo interno da bottom sheet */}
+                            <div className="flex-1 overflow-y-auto p-3 space-y-2.5">
+                                {filterTree.map(item => {
+                                    return (
+                                        <div key={item.categoria} className="flex flex-col gap-1">
+                                            {/* Linha da Categoria-mãe */}
+                                            <div className="flex items-center justify-between bg-gray-50 p-1.5 rounded-xl border border-gray-200">
+                                                <button
+                                                    onClick={() => toggleCategory(item.categoria)}
+                                                    style={{ width: "36px", height: "36px" }}
+                                                    className="flex items-center justify-center shrink-0 cursor-pointer"
+                                                >
+                                                    <div className={"w-6 h-6 rounded-full border transition-all flex items-center justify-center " + (
+                                                        item.selected 
+                                                            ? "bg-blue-600 border-blue-700 text-white font-black" 
+                                                            : "bg-white border-gray-300 text-transparent"
+                                                    )}>
+                                                        ✓
+                                                    </div>
+                                                </button>
+
+                                                <div className="flex-1 pl-1.5 text-left select-none">
+                                                    <span className="text-[12px] font-bold text-gray-900 block">{item.categoria}</span>
+                                                    <span className="text-[9px] text-gray-500 block mt-0.5">
+                                                        {item.activeSubs.length} de {item.subcategorias.length} marcados
+                                                    </span>
+                                                </div>
+                                            </div>
+
+                                            {/* Subcategorias */}
+                                            <div className="pl-3.5 space-y-0.5 border-l border-gray-200 ml-4 pt-1 flex flex-col">
+                                                {item.subcategorias.map(sub => {
+                                                    const active = item.activeSubs.includes(sub);
+                                                    const alerted = activeAlerts.includes(sub);
+                                                    return (
+                                                        <div key={sub} className="flex items-center justify-between py-1 border-b border-gray-150">
+                                                            <div className="flex items-center gap-2">
+                                                                <button
+                                                                    onClick={() => toggleSubcategory(item.categoria, sub)}
+                                                                    style={{ width: "32px", height: "32px" }}
+                                                                    className="flex items-center justify-center cursor-pointer"
+                                                                >
+                                                                    <div className={"w-5 h-5 rounded-full border transition-all flex items-center justify-center " + (
+                                                                        active 
+                                                                            ? "bg-blue-600 border-blue-700 text-white font-bold text-xs" 
+                                                                            : "bg-white border-gray-300 text-transparent"
+                                                                    )}>
+                                                                        ✓
+                                                                    </div>
+                                                                </button>
+                                                                <span className="text-[11px] text-gray-700 font-medium">{sub}</span>
+                                                            </div>
+
+                                                            <button
+                                                                onClick={() => toggleAlert(sub)}
+                                                                style={{ width: "32px", height: "32px" }}
+                                                                className={"flex items-center justify-center cursor-pointer transition " + (
+                                                                    alerted ? "text-blue-600" : "text-gray-400 hover:text-gray-600"
+                                                                )}
+                                                            >
+                                                                🔔
+                                                            </button>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
                     )}
                 </div>
             );
@@ -443,28 +523,12 @@
         const root = ReactDOM.createRoot(document.getElementById('root'));
         root.render(<App />);
         
+        // Inicializa ícones do Lucide
+        setTimeout(() => {
+            if (window.lucide) {
+                window.lucide.createIcons();
+            }
+        }, 800);
     </script>
-    
-    <style>
-        @keyframes slideInUp {
-            from { transform: translateY(100%); opacity: 0; }
-            to { transform: translateY(0); opacity: 1; }
-        }
-        @keyframes fadeIn {
-            from { opacity: 0; }
-            to { opacity: 1; }
-        }
-        .animate-slideInUp {
-            animation: slideInUp 0.3s ease-out forwards;
-        }
-        .animate-fadeIn {
-            animation: fadeIn 0.2s ease-out forwards;
-        }
-        
-        /* Ajuste de scroll para mobile */
-        main {
-            -webkit-overflow-scrolling: touch;
-        }
-    </style>
 </body>
 </html>
