@@ -83,7 +83,7 @@
 
         const SUPABASE_URL = "https://pifarsxbrfwvmvlwvtnk.supabase.co";
         const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBpZmFyc3hicmZ3dm12bHd2dG5rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk2NDg0OTYsImV4cCI6MjA5NTIyNDQ5Nn0.xrgI7q8z0Yew70kxZzWz4v8IiF_eHSY97Ed2NxvTwWw";
-        const VAPID_PUBLIC_KEY = "BOmW8M6X3P7z7v9Hk2J4L5N6Q7R8S9T0U1V2W3X4Y5Z6A7B8C9D0E1F2G3H4I5J6K7L8M9N0O1P2Q3R4S5T6U7V8W9X0Y1Z";
+        const VAPID_PUBLIC_KEY = "BABJwyAjpR8E5Ohl-a63lnx517H57Hdnqq6xDRDGXzwc1_2XU6_oN_4RG3kvDaKIutnknhJlhlDVBS-GqTINz14";
 
         // Ícones em SVG
         const Icons = {
@@ -102,7 +102,7 @@
                         <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center">
                             <img src="https://ais-dev-er44kh4o5vh7gueuj6tubg-427304860856.us-west2.run.app/assets/images/Icone_Point.PNG" className="w-6 h-6 object-contain" alt="Logo" />
                         </div>
-                        <span className="font-black text-blue-900 tracking-tighter uppercase text-sm">POINT MILHAS</span>
+                        <span className="font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-900 to-blue-700 tracking-tighter uppercase text-sm">POINT DAS MILHAS</span>
                     </div>
                     <button onClick={() => setIsBottomSheetOpen(true)} className="p-2 bg-gray-50 rounded-full text-blue-800">
                         <Icons.Filter />
@@ -167,11 +167,14 @@
 
             const getCleanSiteName = (name) => {
                 if (!name) return "Fonte";
-                const lower = name.toLowerCase();
-                if (lower.includes("pontopravoar")) return "Ponto pra Voar";
-                if (lower.includes("passagenspelomundo")) return "Passagens pelo Mundo";
-                if (lower.includes("melhoresdestinos")) return "Melhores Destinos";
-                if (lower.includes("passageirodeprimeira")) return "Passageiro de Primeira";
+                const map = {
+                    "pontopravoar": "Ponto pra Voar",
+                    "passagenspelomundo": "Passagens pelo Mundo",
+                    "melhoresdestinos": "Melhores Destinos",
+                    "passageirodeprimeira": "Passageiro de Primeira"
+                };
+                const cleanName = name.toLowerCase().replace(/[^a-z]/g, "");
+                if (map[cleanName]) return map[cleanName];
                 return name.replace(new RegExp('\.com(\.br)?', 'i'), "").replace(new RegExp('https?:\/\/(www\.)?', ''), "");
             };
 
@@ -290,13 +293,14 @@
             };
 
             const toggleAlert = async (cat, sub, e) => {
-                if(e) e.stopPropagation();
+                if(e) { e.stopPropagation(); e.preventDefault(); }
                 const key = cat + ":::" + sub;
                 const willEnable = !activeAlerts.includes(key);
                 
+                // Update UI instantly
                 if (willEnable) {
-                    await subscribeToPush(cat, sub);
                     setActiveAlerts(prev => [...prev, key]);
+                    await subscribeToPush(cat, sub);
                 } else {
                     setActiveAlerts(prev => prev.filter(k => k !== key));
                 }
@@ -316,36 +320,55 @@
                     <Header setIsBottomSheetOpen={setIsBottomSheetOpen} />
 
                     <div ref={containerRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-4 scrollbar-none pb-24">
-                        {isLoading ? (
-                            <div className="py-20 flex flex-col items-center justify-center gap-3">
-                                <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-                                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Sincronizando...</span>
-                            </div>
-                        ) : filteredPosts.map(post => (
-                            <div key={post.id} onClick={() => setReadingPost(post)} className="bg-white border border-gray-100 p-4 rounded-2xl shadow-sm active:scale-[0.98] transition">
-                                <h3 className="text-sm font-extrabold text-gray-900 leading-snug mb-2">{post.title}</h3>
-                                <div className="flex items-center justify-between text-[10px] font-bold text-gray-400 uppercase mb-3">
-                                    <span className="text-blue-800">{getCleanSiteName(post.source_site)}</span>
-                                    <span className="font-normal text-gray-400">{getRelativeTime(post.published_at)}</span>
-                                </div>
-                                <div className="flex items-center justify-between pt-3 border-t border-gray-50">
-                                    <span className={"text-[9px] px-3 py-1 rounded-full uppercase font-black tracking-widest " + getCategoryTheme(post.categoria).badge}>
-                                        {post.categoria}
-                                    </span>
-                                    <button onClick={(e) => toggleFavorite(post.id, e)} className="p-1 text-gray-300">
-                                      <Icons.Star fill={favorites.includes(post.id) ? "#fbbf24" : "none"} />
-                                    </button>
-                                </div>
-                            </div>
-                        ))}
+                        {activeScreen === "feed" ? (
+                          isLoading ? (
+                              <div className="py-20 flex flex-col items-center justify-center gap-3">
+                                  <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Sincronizando...</span>
+                              </div>
+                          ) : filteredPosts.map(post => (
+                              <div key={post.id} onClick={() => setReadingPost(post)} className="bg-white border border-gray-100 p-4 rounded-2xl shadow-sm active:scale-[0.98] transition">
+                                  <h3 className="text-sm font-extrabold text-gray-900 leading-snug mb-2">{post.title}</h3>
+                                  <div className="flex items-center justify-between text-[10px] font-bold text-gray-400 mb-3">
+                                      <span className="text-blue-800">{getCleanSiteName(post.source_site)}</span>
+                                      <span className="font-normal text-gray-400">{getRelativeTime(post.published_at)}</span>
+                                  </div>
+                                  <div className="flex items-center justify-between pt-3 border-t border-gray-50">
+                                      <span className={"text-[9px] px-3 py-1 rounded-full uppercase font-black tracking-widest " + getCategoryTheme(post.categoria).badge}>
+                                          {post.categoria}
+                                      </span>
+                                      <button onClick={(e) => toggleFavorite(post.id, e)} className="p-1 text-gray-300">
+                                        <Icons.Star fill={favorites.includes(post.id) ? "#fbbf24" : "none"} />
+                                      </button>
+                                  </div>
+                              </div>
+                          ))
+                        ) : (
+                          <div className="space-y-4">
+                            <h2 className="text-lg font-black text-gray-900">Alertas Ativos</h2>
+                            {activeAlerts.length === 0 && <p className="text-sm text-gray-500">Nenhum alerta ativo.</p>}
+                            {activeAlerts.map(key => {
+                                const [cat, sub] = key.split(":::");
+                                return (
+                                  <div key={key} className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex items-center justify-between">
+                                    <div>
+                                      <p className="text-sm font-black text-gray-900">{cat}</p>
+                                      <p className="text-xs text-gray-500">{sub}</p>
+                                    </div>
+                                    <button onClick={() => setActiveAlerts(prev => prev.filter(k => k !== key))} className="text-red-500 text-xs font-bold">REMOVER</button>
+                                  </div>
+                                )
+                            })}
+                          </div>
+                        )}
                     </div>
 
                     <nav className="absolute bottom-0 inset-x-0 h-16 bg-white border-t border-gray-100 grid grid-cols-2 safe-pb">
-                        <button onClick={() => setActiveScreen("feed")} className={"flex flex-col items-center justify-center " + (activeScreen === "feed" ? "text-blue-600" : "text-gray-300")}>
+                        <button onClick={() => setActiveScreen("feed")} className={"flex flex-col items-center justify-center " + (activeScreen === "feed" ? "text-transparent bg-clip-text bg-gradient-to-r from-blue-900 to-blue-700" : "text-gray-300")}>
                             <div className="w-6 h-6"><Icons.Settings /></div>
-                            <span className="text-[9px] font-black uppercase tracking-widest mt-1">Feed</span>
+                            <span className="text-[9px] font-black uppercase tracking-widest mt-1">Notícias</span>
                         </button>
-                        <button onClick={() => setActiveScreen("alerts")} className={"flex flex-col items-center justify-center " + (activeScreen === "alerts" ? "text-blue-600" : "text-gray-300")}>
+                        <button onClick={() => setActiveScreen("alerts")} className={"flex flex-col items-center justify-center " + (activeScreen === "alerts" ? "text-transparent bg-clip-text bg-gradient-to-r from-blue-900 to-blue-700" : "text-gray-300")}>
                             <div className="w-6 h-6 relative">
                                 <Icons.Bell />
                                 {activeAlerts.length > 0 && <div className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-red-500 rounded-full border-white border animate-pulse"></div>}
@@ -386,9 +409,9 @@
                                                         <div className={"w-5 h-5 rounded border transition flex items-center justify-center " + (item.selected ? theme.checkbox : "border-gray-300 bg-white")}>
                                                           {item.selected && <Icons.Check />}
                                                         </div>
-                                                        <span className="text-[11px] font-black text-gray-900 uppercase">{item.categoria}</span>
+                                                        <span className="text-sm font-black text-gray-900 uppercase">{item.categoria}</span>
                                                     </div>
-                                                    <button onClick={(e) => toggleCategoryAlert(item.categoria, e)} className={"p-1.5 rounded-full " + (item.subcategorias.every(s => activeAlerts.includes(item.categoria + ":::" + s)) ? "text-red-500" : "text-gray-300")}>
+                                                    <button onClick={(e) => toggleCategoryAlert(item.categoria, e)} className={"p-1.5 rounded-full flex items-center justify-center " + (item.subcategorias.every(s => activeAlerts.includes(item.categoria + ":::" + s)) ? "text-red-500" : "text-gray-300")}>
                                                         <div className="w-4 h-4"><Icons.Bell /></div>
                                                     </button>
                                                 </div>
@@ -399,9 +422,9 @@
                                                               <div className={"w-4 h-4 rounded border flex items-center justify-center " + (item.activeSubs.includes(sub) ? theme.checkbox : "border-gray-300 bg-white")}>
                                                                 {item.activeSubs.includes(sub) && <div className="w-2 h-2 bg-white rounded-full"></div>}
                                                               </div>
-                                                              <span className="text-xs font-bold text-gray-600">{sub}</span>
+                                                              <span className="text-sm font-bold text-gray-600">{sub}</span>
                                                             </div>
-                                                            <button onClick={(e) => toggleAlert(item.categoria, sub, e)} className={"p-2 rounded-full " + (activeAlerts.includes(item.categoria + ":::" + sub) ? "text-red-500 bg-red-50" : "text-gray-400")}>
+                                                            <button onClick={(e) => toggleAlert(item.categoria, sub, e)} className={"p-2 rounded-full flex items-center justify-center " + (activeAlerts.includes(item.categoria + ":::" + sub) ? "text-red-500 bg-red-50" : "text-gray-400")}>
                                                                 <div className="w-3.5 h-3.5"><Icons.Bell /></div>
                                                             </button>
                                                         </div>
