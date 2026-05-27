@@ -104,8 +104,9 @@
                         </div>
                         <span className="font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-900 to-blue-700 tracking-tighter text-base">Point das Milhas</span>
                     </div>
-                    <button onClick={() => setIsBottomSheetOpen(true)} className="p-2 bg-gray-50 rounded-full text-blue-800">
-                        <Icons.Filter />
+                    <button onClick={() => setIsBottomSheetOpen(true)} className="flex items-center gap-2 px-3 py-2 bg-gray-50 rounded-full text-blue-800 text-xs font-bold uppercase">
+                        <div className="w-4 h-4"><Icons.Filter /></div>
+                        Filtros
                     </button>
                 </header>
             );
@@ -168,10 +169,14 @@
             const getCleanSiteName = (name) => {
                 if (!name) return "Fonte";
                 const map = {
-                    "pontopravoar": "Ponto pra Voar",
-                    "passagenspelomundo": "Passagens pelo Mundo",
-                    "melhoresdestinos": "Melhores Destinos",
-                    "passageirodeprimeira": "Passageiro de Primeira"
+                    "pontopravoar": "Ponto pra voar",
+                    "passagenspelomundo": "Passagens pelo mundo",
+                    "melhoresdestinos": "Melhores destinos",
+                    "passageirodeprimeira": "Passageiro de primeira",
+                    "pontopravoarcombr": "Ponto pra voar",
+                    "passagenspelomundocombr": "Passagens pelo mundo",
+                    "melhoresdestinoscombr": "Melhores destinos",
+                    "passageirodeprimeiracombr": "Passageiro de primeira"
                 };
                 const cleanName = name.toLowerCase().replace(/[^a-z]/g, "");
                 if (map[cleanName]) return map[cleanName];
@@ -234,7 +239,7 @@
                     if (item.categoria === catName) {
                         const active = item.activeSubs.includes(subName);
                         const nextSubs = active ? item.activeSubs.filter(s => s !== subName) : [...item.activeSubs, subName];
-                        return { ...item, activeSubs: nextSubs, selected: nextSubs.length === item.subcategorias.length };
+                        return { ...item, activeSubs: nextSubs };
                     }
                     return item;
                 }));
@@ -281,11 +286,12 @@
                 const purple = { badge: "bg-purple-50 text-purple-700 border border-purple-100 font-black", dot: "bg-purple-600", checkbox: "bg-purple-600 border-purple-600" };
                 const red = { badge: "bg-red-50 text-red-700 border border-red-100 font-black", dot: "bg-red-600", checkbox: "bg-red-600 border-red-600" };
                 const cyan = { badge: "bg-cyan-50 text-cyan-700 border border-cyan-100 font-black", dot: "bg-cyan-600", checkbox: "bg-cyan-600 border-cyan-600" };
+                const pink = { badge: "bg-pink-50 text-pink-700 border border-pink-100 font-black", dot: "bg-pink-600", checkbox: "bg-pink-600 border-pink-600" };
                 
                 if (lower.includes("transferência bonificada") || lower.includes("transfência bonificada")) return green;
                 if (lower.includes("passagem com milhas")) return yellow;
                 if (lower.includes("passagem em dinheiro")) return blue;
-                if (lower.includes("cartão") || lower.includes("credito")) return orange;
+                if (lower.includes("cartão") || lower.includes("cartao") || lower.includes("credito")) return pink;
                 if (lower.includes("hotel")) return purple;
                 if (lower.includes("alteração") || lower.includes("regras")) return red;
                 if (lower.includes("status match") || lower.includes("gratuito")) return cyan;
@@ -313,7 +319,12 @@
                 const node = filterTree.find(n => n.categoria === cat);
                 if (!node) return true;
                 return node.selected && node.activeSubs.includes(sub);
-            }).sort((a, b) => new Date(b.published_at) - new Date(a.published_at));
+            }).sort((a, b) => {
+                const aFav = favorites.includes(a.id);
+                const bFav = favorites.includes(b.id);
+                if (aFav !== bFav) return aFav ? -1 : 1;
+                return new Date(b.published_at) - new Date(a.published_at);
+            });
 
             return (
                 <div className="flex flex-col h-[100dvh] w-full md:max-w-md mx-auto bg-[#f3f4f6] relative overflow-hidden shadow-2xl">
@@ -364,11 +375,11 @@
                     </div>
 
                     <nav className="absolute bottom-0 inset-x-0 h-16 bg-white border-t border-gray-100 grid grid-cols-2 safe-pb">
-                        <button onClick={() => setActiveScreen("feed")} className={"flex flex-col items-center justify-center " + (activeScreen === "feed" ? "text-transparent bg-clip-text bg-gradient-to-r from-blue-900 to-blue-700 text-transparent" : "text-gray-300")}>
+                        <button onClick={() => setActiveScreen("feed")} className={"flex flex-col items-center justify-center " + (activeScreen === "feed" ? "text-transparent bg-clip-text bg-gradient-to-r from-blue-900 to-blue-700" : "text-gray-300")}>
                             <div className="w-6 h-6"><Icons.Settings /></div>
                             <span className="text-[9px] font-black uppercase tracking-widest mt-1">Notícias</span>
                         </button>
-                        <button onClick={() => setActiveScreen("alerts")} className={"flex flex-col items-center justify-center " + (activeScreen === "alerts" ? "text-transparent bg-clip-text bg-gradient-to-r from-blue-900 to-blue-700 text-transparent" : "text-gray-300")}>
+                        <button onClick={() => setActiveScreen("alerts")} className={"flex flex-col items-center justify-center " + (activeScreen === "alerts" ? "text-transparent bg-clip-text bg-gradient-to-r from-blue-900 to-blue-700" : "text-gray-300")}>
                             <div className="w-6 h-6 relative">
                                 <Icons.Bell />
                                 {activeAlerts.length > 0 && <div className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-red-500 rounded-full border-white border animate-pulse"></div>}
@@ -424,8 +435,8 @@
                                                               </div>
                                                               <span className="text-base font-bold text-gray-600">{sub}</span>
                                                             </div>
-                                                            <button onClick={(e) => toggleAlert(item.categoria, sub, e)} className={"p-1.5 rounded-full flex items-center justify-center " + (activeAlerts.includes(item.categoria + ":::" + sub) ? "text-red-500 bg-red-50" : "text-gray-400")}>
-                                                                <div className="w-4 h-4"><Icons.Bell /></div>
+                                                            <button onClick={(e) => toggleAlert(item.categoria, sub, e)} className={"w-10 h-10 rounded-full flex items-center justify-center transition-colors " + (activeAlerts.includes(item.categoria + ":::" + sub) ? "text-red-500 bg-red-50" : "text-gray-400")}>
+                                                                <div className="w-5 h-5 flex items-center justify-center"><Icons.Bell /></div>
                                                             </button>
                                                         </div>
                                                     ))}
